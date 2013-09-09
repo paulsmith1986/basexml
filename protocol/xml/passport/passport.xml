@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<!--服务器信息-->
+	<struct name="game_server_info">
+		<key name="server_id" type="int" desc="游戏区id"/>
+		<key name="name" type="varchar" desc="游戏区名称"/>
+		<key name="status" type="tinyint" desc="服务器状态"/>
+	</struct>
+	<protocol>
+		<!--登录帐号-->
+		<request name="account_login" id="35000" size="200">
+			<key name="username" type="varchar" desc="用户名"/>
+			<key name="password" type="varchar" desc="密码"/>
+		</request>
+		<!--注册新帐号-->
+		<request name="account_signup" id="35003" size="200">
+			<key name="username" type="varchar" desc="用户名"/>
+			<key name="password" type="varchar" desc="密码"/>
+		</request>
+		<!--登录成功(运行时刻确定分配内存大小)-->
+		<response name="server_list" id="35002" size="runtime">
+			<key name="username" type="varchar" desc="用户名"/>
+			<key name="cookie" type="varchar" desc="cookie"/>
+			<key name="server_list" type="list">
+				<list type="struct" struct="game_server_info"/>
+			</key>
+		</response>
+	</protocol>
+	<protocol>
+		<!--进入游戏-->
+		<request name="enter_server" id="35005" size="100">
+			<key name="server_id" type="int" desc="游戏区id"/>
+		</request>
+		<!--返回进入游戏hashkey-->
+		<response name="enter_server_re" id="35006" size="500">
+			<key name="server_id" type="int" desc="游戏区id"/>
+			<key name="host" type="varchar" desc="IP地址"/>
+			<key name="port" type="int" desc="端口号"/>
+			<key name="auth_key" type="varchar" desc="进入游戏的认证key"/>
+		</response>
+	</protocol>
+	<protocol>
+		<!--出错-->
+		<response name="passport_error" id="35001" size="500">
+			<key name="error_no" type="int" desc="错误id"/>
+			<key name="error_arg" type="list" desc="错误参数(通常是显示错误描述时用到的变量)">
+				<list type="varchar"/>
+			</key>
+			<key name="error_msg" type="varchar" desc="错误描述(调试用,不做为错误原因显示给用户)"/>
+		</response>
+	</protocol>
+</root>

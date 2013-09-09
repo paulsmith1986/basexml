@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<protocol>
+		<!--代理数据包-->
+		<response name="so_fpm_proxy" id="60000" size="6k">
+			<key name="role_id" type="unsigned int" desc="用户id"/>
+			<key name="session_id" type="unsigned int" desc="会话id"/>
+			<key name="data" type="byte" desc="转发数据包"/>
+		</response>
+	</protocol>
+</root>
