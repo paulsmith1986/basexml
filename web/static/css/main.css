@@ -1,0 +1,27 @@
+body{margin: 0px; padding: 0px; color: #192E32; font: 15px "sans-serif", "Arial", "Verdana";}
+form {margin: 0px; padding: 0px;}
+input, textarea, select{font-size: 12px;}
+img{border:none;}
+table{border-collapse: collapse;}
+a:visited{color: #335B64; text-decoration: none;}
+a:link{color: #335B64;text-decoration: none;}
+a:hover{color: #EB8A3D; text-decoration: underline;}
+a:active{color: #EB8A3D; text-decoration: underline;}
+.clear {clear: both; float: none; font-size: 0px; margin: 0; padding: 0; display:block;}
+.nowrap{white-space:nowrap;}
+.cen{text-align:center;}
+.red{color:red;}
+.click{cursor:pointer;}
+.hide{display:none;}
+.show{display:default;}
+.bold{font-weight:bold;}
+.green{color:green;}
+select, input, img{vertical-align:middle;}
+
+#head{
+	padding: 10px;
+	text-align: center;
+	line-height: 30px;
+}
+#head .item{margin:0 5px;}
+#simulate_list li{line-height: 180%}

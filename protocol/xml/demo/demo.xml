@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<!--Comment here!-->
+	<struct name="car_info">
+		<key name="car_id" type="int" desc="编号"/>
+		<key name="color" type="varchar" desc="颜色"/>
+		<key name="owner" type="varchar" desc="车主姓名"/>
+	</struct>
+	<protocol>
+		<!--测试加法-->
+		<request name="test_add">
+			<key name="a" type="int"/>
+			<key name="b" type="int"/>
+		</request>
+		<!--加法返回-->
+		<response name="test_add_re">
+			<key name="re" type="int"/>
+		</response>
+		<!--测试私有struct-->
+		<request name="demo_role_info" size="400">
+			<key name="name" type="char" len="20" desc="姓名"/>
+			<key name="age" type="tinyint" desc="年龄"/>
+			<key name="contact" type="struct" desc="联系方式">
+				<struct>
+					<key name="QQ" type="varchar" desc="QQ"/>
+					<key name="mobile" type="char" len="15" desc="手机"/>
+					<key name="email" type="list" desc="Email">
+						<list type="varchar"/>
+					</key>
+				</struct>
+			</key>
+		</request>
+		<!--测试私有struct-->
+		<response name="demo_role_info_re" size="400">
+			<key name="name" type="char" len="20" desc="姓名"/>
+			<key name="age" type="tinyint" desc="年龄"/>
+			<key name="contact" type="struct" desc="联系方式">
+				<struct>
+					<key name="QQ" type="varchar" desc="QQ"/>
+					<key name="mobile" type="char" len="15" desc="手机"/>
+					<key name="email" type="list" desc="Email">
+						<list type="list">
+							<list type="list">
+								<list type="varchar"/>
+							</list>
+						</list>
+					</key>
+					<key name="phone" type="list" desc="phone">
+						<list type="list">
+							<list type="char" len="15"/>
+						</list>
+					</key>
+				</struct>
+			</key>
+		</response>
+		<!--请求-->
+		<request name="car_list" size="200">
+			<key name="car_a" type="struct" struct="car_info"/>
+			<key name="car_b" type="struct" struct="car_info"/>
+			<key name="car_c" type="struct" struct="car_info"/>
+		</request>
+		<!--请求-->
+		<response name="car_list_re" size="200">
+			<key name="car_a" type="struct" struct="car_info"/>
+			<key name="car_b" type="struct" struct="car_info"/>
+			<key name="car_c" type="struct" struct="car_info"/>
+		</response>
+	</protocol>
+</root>
