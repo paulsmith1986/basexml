@@ -5,18 +5,12 @@ $GLOBALS['AS_ROOT_PATH'] = '/data/wwwroot/flash_protocol';
 /**
  * 生成协议PHP文件
  */
-function tool_protocol()
+function tool_protocol( $file_name )
 {
-	tool_protocol_xml( 'as_php_amf' );
 	$php_doc = array( );
-	$proto_name_list = array( );
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => & $protocol )
 	{
 		$protocol[ 'name' ] = lcfirst( $protocol[ 'name' ] );
-		if ( 0 == $protocol[ 'is_sub' ] )
-		{
-			$proto_name_list[ $protocol[ 'name' ] ] = (int) $protocol[ 'struct_id' ];
-		}
 		$struct_name = $protocol[ 'name' ];
 		$items = $GLOBALS[ 'all_protocol_item' ][ $pid ];
 		$func_str = "\t\$out_data = array();\n";
@@ -25,7 +19,8 @@ function tool_protocol()
 			switch ( $rs[ 'type' ] )
 			{
 				case 'byte'://复杂数据
-					$func_str .= "\t\$out_data[] = \$data_arr[ '{$rs[ 'item_name' ]}' ];\n";
+					$func_str .= "\t\$tmp = is_array( \$data_arr[ '{$rs[ 'item_name' ]}' ] ) ? amf_encode( \$data_arr[ '{$rs[ 'item_name' ]}' ], 1|2 ) : \$data_arr[ '{$rs[ 'item_name' ]}' ];\n";
+					$func_str .= "\t\$out_data[] = base64_encode( \$tmp );\n";
 					break;
 				case 'varchar':
 				case 'char':
@@ -52,16 +47,54 @@ function tool_protocol()
 		$head_str .= " */\n";
 		$head_str .= "function prot_" . $struct_name . "_out( \$data_arr )\n{\n";
 		$func_str = $head_str . $func_str;
-		$php_doc[ ] = $func_str;
+		$php_doc[] = $func_str;
 	}
-	$file = ROOT_PATH . 'protocol/amf_response.php';
-	$file_str = "<?php\n";
-	$file_str .= "\$PROTOCOL_ID_LIST = ";
-	$file_str .= var_export( $proto_name_list, true ) . ";\n";
 	//写文件
-	$file_str .= join( '', $php_doc );
-	file_put_contents( $file, $file_str );
-	echo "生成协议文件:" . $file . "\n";
+	$file_str = "<?php\n" .join( '', $php_doc ) ."\n?>";
+	file_put_contents( $file_name, $file_str );
+	echo "生成协议文件:" . $file_name ."\n" ;
+}
+
+/**
+ * 生成name_id的map
+ */
+function tool_so_id_name_map( $type = 2 )
+{
+	$id_map_list = array();
+	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
+	{
+		if ( $info[ 'is_sub' ] )
+		{
+			continue;
+		}
+		if ( !( $info[ 'proto_type' ] & $type ) )
+		{
+			continue;
+		}
+		$id_map_list[ $info[ 'struct_id' ] ] = $pid;
+	}
+	return var_export( $id_map_list, true );
+}
+
+/**
+ * 生成id=>name的map
+ */
+function tool_so_name_id_map( $type = 2 )
+{
+	$name_id_map = array();
+	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
+	{
+		if ( $info[ 'is_sub' ] )
+		{
+			continue;
+		}
+		if ( !( $info[ 'proto_type' ] & $type ) )
+		{
+			continue;
+		}
+		$name_id_map[ $pid ] = (int)$info[ 'struct_id' ];
+	}
+	return var_export( $name_id_map, true );
 }
 
 /**
@@ -76,6 +109,11 @@ function tool_protocol_read_list( $list_id, $parent, $data, $rank = 1 )
 		$sub_tab .= "\t";
 	}
 	$re_str = "\$list_re" . $rank . " = array();\n";
+	$re_str .= $sub_tab . "if( empty( \${$data} ) )\n";
+	$re_str .= $sub_tab . "{\n";
+	$re_str .= $sub_tab . "\t\${$data} = array();\n";
+	$re_str .= $sub_tab . "}\n";
+
 	$re_str .= $sub_tab . "foreach( \$" . $data . " as \$sub_dat" . $rank . " )\n";
 	$re_str .= $sub_tab . "{\n";
 	switch ( $list_rs[ 'type' ] )
@@ -135,7 +173,7 @@ function tool_protocol_amf_dir_reset()
  */
 function tool_protocol_amf_s2c()
 {
-	tool_protocol_xml( 'as_php_amf' );
+	tool_protocol_xml( ROOT_PATH .'tool/protocol/xml/as_php_amf', 'response' );
 	tool_protocol_amf_dir_reset();
 	$root_path = $GLOBALS['AS_ROOT_PATH'];
 	$com_path = 'com.yile.tkd';
@@ -151,7 +189,10 @@ function tool_protocol_amf_s2c()
 	foreach ( $protocols as $pid => $struct )
 	{
 		$struct_id = $struct['struct_id'];
-
+		if( 0 != $struct_id && 1 == $struct[ 'proto_type' ] )
+		{
+			continue;
+		}
 		$class_name = str_to_camel( $struct[ 'name' ] ) . ( 0 != $struct_id ? '_DataVO' : '_DS' );
 		$model_name = ucfirst( $struct[ 'module' ] . 'Model' );
 		$struct[ 'module' ] = lcfirst( $struct[ 'module' ] );
@@ -163,11 +204,12 @@ function tool_protocol_amf_s2c()
 
 		if( 0 != $struct_id )
 		{
-			$protocol_vo_imports[ ] = "import {$package_class};\n";
-			$protocol_vo_funcs[ ] = "_factory.addVo( new {$class_name}() );\n";
+			$protocol_vo_imports[] = "import {$package_class};\n";
+			$protocol_vo_funcs[] = "_factory.addVo( new {$class_name}() );\n";
 		}
 
-		$imports = array( );
+		$imports = array( "\timport flash.utils.ByteArray;\n" );
+		$imports[] = "\timport com.yile.tkd.core.Game;\n";
 		$propertys = array( );
 		$propertys_init = array( );
 
@@ -175,11 +217,11 @@ function tool_protocol_amf_s2c()
 
 		if( 0 != $struct_id )
 		{
-			$propertys[ ] = "\t\tprivate var _protocol_id:int = {$struct[ 'struct_id' ]};\n";
-			$propertys[ ] = "\t\tprivate var _modelClass:String = \"{$model_class}\";\n";
+			$propertys[] = "\t\tprivate var _protocol_id:int = {$struct[ 'struct_id' ]};\n";
+			$propertys[] = "\t\tprivate var _modelClass:String = \"{$model_class}\";\n";
 			$property_name = lcfirst( str_to_camel( $struct[ 'name' ] ) );
-			$propertys[ ] = "\t\tprivate var _modelProperty:String = \"{$property_name}\";\n";
-			$propertys[ ] = "\n";
+			$propertys[] = "\t\tprivate var _modelProperty:String = \"{$property_name}\";\n";
+			$propertys[] = "\n";
 		}
 
 		foreach ( $items as $key => $val )
@@ -189,8 +231,8 @@ function tool_protocol_amf_s2c()
 			switch ( $val[ 'type' ] )
 			{
 				case 'byte'://复杂数据
-					$property .= "Object";
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
+					$property .= "ByteArray";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = Game.tool.base64_decode( data[ {$key} ] );\n";
 					break;
 				case 'tinyint':  //有符号8位数字
 				case 'unsigned tinyint':  //无符号8位数字
@@ -199,30 +241,30 @@ function tool_protocol_amf_s2c()
 				case 'int':   //有符号32位数字
 					$property .= "int";
 					//属性构造
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
 					break;
 				case 'unsigned int':  //无符号32位数字
 					$property .= "uint";
 					//属性构造
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
 					break;
-				case 'big int':  //有符号64位数字
+				case 'bigint':  //有符号64位数字
 					$property .= "Number";
 					//属性构造
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
 					break;
 				case 'varchar':  //字符串
 				case 'char':
 					$property .= "String";
 					//属性构造
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = data[{$key}];\n";
 					break;
 				case 'list':  //数组
 					$property .= tool_protocol_as_vector( $val[ 'sub_id' ], $imports, $protocol_path, '_DS', 'amf' );
-					$propertys_init[ ] = "\n";
-					$propertys_init[ ] = "\t\t\t//数组\n";
-					$propertys_init[ ] = tool_protocol_property_vector_code( $val[ 'sub_id' ], "data[{$key}]", $val[ 'item_name' ], $key );
-					$propertys_init[ ] = "\n";
+					$propertys_init[] = "\n";
+					$propertys_init[] = "\t\t\t//数组\n";
+					$propertys_init[] = tool_protocol_property_vector_code( $val[ 'sub_id' ], "data[{$key}]", $val[ 'item_name' ], $key );
+					$propertys_init[] = "\n";
 					break;
 				case 'struct':
 					$sub_data = $GLOBALS[ 'all_protocol' ][ $val[ 'sub_id' ] ];
@@ -239,68 +281,75 @@ function tool_protocol_amf_s2c()
 						$imports[ $vo_class ] = "\timport " . $protocol_path . '.' . $sub_data[ 'module' ] . '.' . $vo_class . ";\n";
 					}
 					//属性构造
-					$propertys_init[ ] = "\t\t\t//数据对象\n";
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]} = new {$vo_class}();\n";
-					$propertys_init[ ] = "\t\t\tthis.{$val[ 'item_name' ]}.init( data[{$key}] );\n";
+					$propertys_init[] = "\t\t\t//数据对象\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]} = new {$vo_class}();\n";
+					$propertys_init[] = "\t\t\tthis.{$val[ 'item_name' ]}.init( data[{$key}] );\n";
 					break;
 			}
 
-			$propertys[ ] = $property . ";\n";
+			$propertys[] = $property . ";\n";
 		}
 		//准备拼接AS代码
 		$class_content = array( );
-		$class_content[ ] = $package . "\n";
-		$class_content[ ] = "{\n";
+		$class_content[] = $package . "\n";
+		$class_content[] = "{\n";
 		//其他协议数据类
-		$class_content[ ] = join( '', $imports );
+		$class_content[] = join( '', $imports );
 
 		if( 0 != $struct_id )
 		{
-			$class_content[ ] = "\timport {$ivo_package};\n";
-			$class_content[ ] = "\n";
-			$class_content[ ] = "\tpublic class {$class_name} implements IVo\n";
+			$class_content[] = "\timport {$ivo_package};\n";
+			$class_content[] = "\n";
+			$class_content[] = "\tpublic class {$class_name} implements IVo\n";
 		}
 		else
 		{
-			$class_content[ ] = "\tpublic class {$class_name}\n";
+			$class_content[] = "\tpublic class {$class_name}\n";
 		}
 
-		$class_content[ ] = "\t{\n";
+		$class_content[] = "\t{\n";
 
 		//属性
-		$class_content[ ] = join( '', $propertys ) . "\n";
+		$class_content[] = join( '', $propertys ) . "\n";
 
 		//构造
-		$class_content[ ] = "\t\tpublic function " . $class_name . "():void{}\n\n";
+		$class_content[] = "\t\tpublic function " . $class_name . "():void{}\n\n";
 
 		//赋值
-		$class_content[ ] = "\t\tpublic function init( data:Array ):void\n";
-		$class_content[ ] = "\t\t{\n";
-		$class_content[ ] = join( '', $propertys_init );//属性赋值
-		$class_content[ ] = "\t\t}\n\n";
-
+		$class_content[] = "\t\tpublic function init( data:Array ):void\n";
+		$class_content[] = "\t\t{\n";
+		$class_content[] = join( '', $propertys_init );//属性赋值
+		$class_content[] = "\t\t}\n\n";
+		$class_content[] = tool_as_protocol_print( $items, $struct );
 		//接口
 		if( 0 != $struct_id )
 		{
-			$class_content[ ] = "\t\tpublic function get modelClass():String\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _modelClass;\n";
-			$class_content[ ] = "\t\t}\n\n";
+			$class_content[] = "\t\tpublic function get modelClass():String\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn _modelClass;\n";
+			$class_content[] = "\t\t}\n\n";
 
-			$class_content[ ] = "\t\tpublic function get modelProperty():String\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _modelProperty;\n";
-			$class_content[ ] = "\t\t}\n\n";
+			$class_content[] = "\t\tpublic function get modelProperty():String\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn _modelProperty;\n";
+			$class_content[] = "\t\t}\n\n";
 
-			$class_content[ ] = "\t\tpublic function get pid():int\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _protocol_id;\n";
-			$class_content[ ] = "\t\t}\n";
+			$class_content[] = "\t\tpublic function get pid():int\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn _protocol_id;\n";
+			$class_content[] = "\t\t}\n";
+
+			$class_content[] = "\t\tpublic function get isWhiteList():Boolean\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn ";
+			$class_content[] = isset( $struct[ 'is_write_list' ] ) ? 'true' : 'false';
+			$class_content[] = ";\n";
+			$class_content[] = "\t\t}\n";
 		}
 
-		$class_content[ ] = "\t}\n";
+		$class_content[] = "\t}\n";
 
-		$class_content[ ] = "}\n";
+		$class_content[] = "}\n";
 
 		file_put_contents( $protocol_data_file, $class_content );
 		if( 0 != $struct_id )
@@ -316,18 +365,18 @@ function tool_protocol_amf_s2c()
 	//接口基类，注册基类，工厂基类
 	$reg_file = $root_path . '/ProtocolRegister.as';
 	$rge_file_class = array( );
-	$rge_file_class[ ] = "package {$protocol_path}\n";
-	$rge_file_class[ ] = "{\n";
-	$rge_file_class[ ] = "\t" . join( "\t", $protocol_vo_imports ) . "\n";
-	$rge_file_class[ ] = "\tpublic class ProtocolRegister\n";
-	$rge_file_class[ ] = "\t{\n";
-	$rge_file_class[ ] = "\t\tprivate var _factory:VoFactory = VoFactory.getInstance();\n\n";
-	$rge_file_class[ ] = "\t\tpublic function ProtocolRegister():void\n";
-	$rge_file_class[ ] = "\t\t{\n";
-	$rge_file_class[ ] = "\t\t\t" . join( "\t\t\t", $protocol_vo_funcs );
-	$rge_file_class[ ] = "\t\t}\n";
-	$rge_file_class[ ] = "\t}\n";
-	$rge_file_class[ ] = "}";
+	$rge_file_class[] = "package {$protocol_path}\n";
+	$rge_file_class[] = "{\n";
+	$rge_file_class[] = "\t" . join( "\t", $protocol_vo_imports ) . "\n";
+	$rge_file_class[] = "\tpublic class ProtocolRegister\n";
+	$rge_file_class[] = "\t{\n";
+	$rge_file_class[] = "\t\tprivate var _factory:VoFactory = VoFactory.getInstance();\n\n";
+	$rge_file_class[] = "\t\tpublic function ProtocolRegister():void\n";
+	$rge_file_class[] = "\t\t{\n";
+	$rge_file_class[] = "\t\t\t" . join( "\t\t\t", $protocol_vo_funcs );
+	$rge_file_class[] = "\t\t}\n";
+	$rge_file_class[] = "\t}\n";
+	$rge_file_class[] = "}";
 
 	file_put_contents( $reg_file, $rge_file_class );
 	echo "\n响应协议注册基类.>>>>>>", $reg_file, "\n\n";
@@ -338,7 +387,7 @@ function tool_protocol_amf_s2c()
  */
 function tool_protocol_amf_c2s()
 {
-	tool_protocol_xml( 'as_php_amf', 'request' );
+	tool_protocol_xml( ROOT_PATH .'tool/protocol/xml/as_php_amf', 'request' );
 	$root_path = $GLOBALS['AS_ROOT_PATH'];
 	$com_path = 'com.yile.tkd';
 	$protocol_path = "{$com_path}.protocol.amf";
@@ -371,11 +420,9 @@ function tool_protocol_amf_c2s()
 		$items = $GLOBALS[ 'all_protocol_item' ][ $pid ];
 		if(  0 != $struct_id )
 		{
-			$propertys[ ] = "\t\tprivate var _pid:int = {$struct[ 'struct_id' ]};\n";
-			$propertys[ ] = "\t\tprivate var _c:String = \"{$struct[ 'control' ]}\";\n";
-			$propertys[ ] = "\t\tprivate var _a:String = \"{$struct[ 'action' ]}\";\n";
+			$propertys[] = "\t\tprivate var _pid:int = {$struct[ 'struct_id' ]};\n";
 		}
-		$propertys[ ] = "\n";
+		$propertys[] = "\n";
 
 		$colls = array();
 
@@ -389,27 +436,27 @@ function tool_protocol_amf_c2s()
 			{
 				case 'byte'://复杂数据
 					$property .= "Object";
-					break;
+				break;
 				case 'tinyint':  //有符号8位数字
 				case 'unsigned tinyint':  //无符号8位数字
 				case 'smallint':  //有符号16位数字
 				case 'unsigned smallint':  //无符号16位数字
 				case 'int':   //有符号32位数字
 					$property .= "int";
-					break;
+				break;
 				case 'unsigned int':  //无符号32位数字
 					$property .= "uint";
-					break;
-				case 'big int':  //有符号64位数字
+				break;
+				case 'bigint':  //有符号64位数字
 					$property .= "Number";
-					break;
+				break;
 				case 'varchar':  //字符串
 				case 'char':
 					$property .= "String";
-					break;
+				break;
 				case 'list':  //数组
 					$property .= tool_protocol_as_vector( $val[ 'sub_id' ], $imports, $protocol_path );
-					break;
+				break;
 				case 'struct':
 					$sub_data = $GLOBALS[ 'all_protocol' ][ $val[ 'sub_id' ] ];
 					$sub_data[ 'module' ] = lcfirst( $sub_data[ 'module' ] );
@@ -423,105 +470,75 @@ function tool_protocol_amf_c2s()
 					{
 						$imports[ $ro_class ] = "\timport " . $protocol_path . '.' . $sub_data[ 'module' ] . '.' . $ro_class . ";\n";
 					}
-					break;
+				break;
 			}
 
-			$propertys[ ] = $property . ";\n";
+			$propertys[] = $property . ";\n";
 		}
 
 		if( 0 != $struct_id )
 		{
 			if( !empty( $colls ) )
 			{
-				$propertys[ ] = "\t\tprivate var _args:Array = [ " . join( ',', $colls ) . " ];\n";
+				$propertys[] = "\t\tprivate var _args:Array = [ " . join( ',', $colls ) . " ];\n";
 			}
 			else
 			{
-				$propertys[ ] = "\t\tprivate var _args:Array = [];\n";
+				$propertys[] = "\t\tprivate var _args:Array = [];\n";
 			}
 		}
 
 		//准备拼接AS代码
 		$class_content = array( );
-		$class_content[ ] = $package . "\n";
-		$class_content[ ] = "{\n";
+		$class_content[] = $package . "\n";
+		$class_content[] = "{\n";
 		//其他协议数据类
-		$class_content[ ] = join( '', $imports );
+		$class_content[] = join( '', $imports );
 
 		if( 0 != $struct_id )
 		{
-			$class_content[ ] = "\timport {$ireq_package};\n";
-			$class_content[ ] = "\timport {$com_path}.service.GetRequest;\n";
-			$class_content[ ] = "\n";
-			$class_content[ ] = "\tpublic class {$class_name} extends GetRequest implements IReq\n";
+			$class_content[] = "\timport {$ireq_package};\n";
+			$class_content[] = "\timport {$com_path}.protocol.amf.GetRequest;\n";
+			$class_content[] = "\n";
+			$class_content[] = "\tpublic class {$class_name} extends GetRequest implements IReq\n";
 		}
 		else
 		{
-			$class_content[ ] = "\n";
-			$class_content[ ] = "\tpublic class {$class_name}\n";
+			$class_content[] = "\n";
+			$class_content[] = "\tpublic class {$class_name}\n";
 		}
 
 
-		$class_content[ ] = "\t{\n";
+		$class_content[] = "\t{\n";
 
 		//属性
-		$class_content[ ] = join( '', $propertys ) . "\n";
+		$class_content[] = join( '', $propertys ) . "\n";
 
 		//构造
-		$class_content[ ] = "\t\tpublic function " . $class_name . "():void{}\n\n";
+		$class_content[] = "\t\tpublic function " . $class_name . "():void{}\n\n";
 		if( 0 != $struct_id )
 		{
 			//接口
-			$class_content[ ] = "\t\tpublic function get pid():int\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _pid;\n";
-			$class_content[ ] = "\t\t}\n";
-			$class_content[ ] = "\n";
+			$class_content[] = "\t\tpublic function get pid():int\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn _pid;\n";
+			$class_content[] = "\t\t}\n";
+			$class_content[] = "\n";
 
-			$class_content[ ] = "\t\tpublic function get c():String\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _c;\n";
-			$class_content[ ] = "\t\t}\n";
-			$class_content[ ] = "\n";
+			$class_content[] = "\t\tpublic function get args():Array\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\treturn _args;\n";
+			$class_content[] = "\t\t}\n";
+			$class_content[] = "\n";
 
-			$class_content[ ] = "\t\tpublic function get a():String\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _a;\n";
-			$class_content[ ] = "\t\t}\n";
-			$class_content[ ] = "\n";
-
-			//特殊包，允许复写C,A
-			if( 'game_confirm_request' == $struct['name'] )
-			{
-				$class_content[ ] = "\t\tpublic function set c( val:String ):void\n";
-				$class_content[ ] = "\t\t{\n";
-				$class_content[ ] = "\t\t\t_c = val;\n";
-				$class_content[ ] = "\t\t}\n";
-				$class_content[ ] = "\n";
-
-				$class_content[ ] = "\t\tpublic function set a( val:String ):void\n";
-				$class_content[ ] = "\t\t{\n";
-				$class_content[ ] = "\t\t\t_a = val;\n";
-				$class_content[ ] = "\t\t}\n";
-				$class_content[ ] = "\n";
-			}
-
-			$class_content[ ] = "\t\tpublic function get args():Array\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\treturn _args;\n";
-			$class_content[ ] = "\t\t}\n";
-			$class_content[ ] = "\n";
-
-			$class_content[ ] = "\t\tpublic function send():void\n";
-			$class_content[ ] = "\t\t{\n";
-			$class_content[ ] = "\t\t\tthis.sendToServer(this);\n";
-			$class_content[ ] = "\t\t}\n";
+			$class_content[] = "\t\tpublic function send():void\n";
+			$class_content[] = "\t\t{\n";
+			$class_content[] = "\t\t\tthis.sendToServer(this);\n";
+			$class_content[] = "\t\t}\n";
 		}
-
-		$class_content[ ] = "\t}\n";
-
-		$class_content[ ] = "}\n";
-
+		$class_content[] = tool_as_protocol_print( $items, $struct );
+		$class_content[] = "\t}\n";
+		$class_content[] = "}\n";
 		file_put_contents( $protocol_data_file, $class_content );
 		echo "生成发送协议数据类文件++++++> ", $protocol_data_file, "\n";
 	}
@@ -562,9 +579,9 @@ function tool_protocol_property_vector_code( $list_id, $data_name, $property_nam
 	$data_val = 'data_' . $key . '_' . $count;
 	$vector_val = 'vector_' . $key . '_' . $count;
 
-	$code[ ] = "\t\t\tvar {$data_val}:Array = " . $data_name . ";\n";
-	$code[ ] = "\t\t\t" . vector_list_parse( $list_id, $data_val, $vector_val, $count, "\t\t\t" );
-	$code[ ] = "\t\t\tthis.{$property_name} = " . $vector_val . ";\n";
+	$code[] = "\t\t\tvar {$data_val}:Array = " . $data_name . ";\n";
+	$code[] = "\t\t\t" . vector_list_parse( $list_id, $data_val, $vector_val, $count, "\t\t\t" );
+	$code[] = "\t\t\tthis.{$property_name} = " . $vector_val . ";\n";
 
 	return join( '', $code );
 }
@@ -596,78 +613,63 @@ function vector_list_parse( $list_id, $data_val, $vector_val, & $count, $p )
 	$next_vector_val = substr( $vector_val, 0, $pos + 1 ) . $count;
 
 	$a = array( );
-	$for_code[ ] = "var {$vector_val}:" . tool_protocol_as_vector( $list_id, $a ) . " = new " . tool_protocol_as_vector( $list_id, $a ) . "();\n";
+	$for_code[] = "var {$vector_val}:" . tool_protocol_as_vector( $list_id, $a ) . " = new " . tool_protocol_as_vector( $list_id, $a ) . "();\n";
 
 	switch ( $data[ 'type' ] )
 	{
 		case 'byte':  //复杂数据
-			$for_code[ ] = "for each( var {$next_data_val}:Object in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t{$vector_val}.push( {$next_data_val} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:String in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t{$vector_val}.push( Game.tool.base64_decode( {$next_data_val} ) );\n";
+			$for_code[] = "}\n";
 			break;
-		case 'big int':  //有符号64位数字
-			$for_code[ ] = "for each( var {$next_data_val}:Number in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t{$vector_val}.push( {$next_data_val} );\n";
-			$for_code[ ] = "}\n";
+		case 'bigint':  //有符号64位数字
+			$for_code[] = "for each( var {$next_data_val}:Number in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t{$vector_val}.push( {$next_data_val} );\n";
+			$for_code[] = "}\n";
 			break;
 		case 'varchar':
 		case 'char':
-			$for_code[ ] = "for each( var {$next_data_val}:String in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t{$vector_val}.push( {$next_data_val} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:String in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t{$vector_val}.push( {$next_data_val} );\n";
+			$for_code[] = "}\n";
 			break;
 		case 'tinyint':  //有符号8位数字
 		case 'unsigned tinyint':  //无符号8位数字
 		case 'smallint':  //有符号16位数字
 		case 'unsigned smallint':  //无符号16位数字
 		case 'int':   //有符号32位数字
-			$for_code[ ] = "for each( var {$next_data_val}:int in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t{$vector_val}.push( {$next_data_val} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:int in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t{$vector_val}.push( {$next_data_val} );\n";
+			$for_code[] = "}\n";
 			break;
 		case 'unsigned int':  //无符号32位数字
-			$for_code[ ] = "for each( var {$next_data_val}:uint in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t{$vector_val}.push( {$next_data_val} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:uint in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t{$vector_val}.push( {$next_data_val} );\n";
+			$for_code[] = "}\n";
 			break;
 		case 'list':
-			$for_code[ ] = "for each( var {$next_data_val}:Array in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\t" . vector_list_parse( $data[ 'sub_id' ], $next_data_val, $next_vector_val, $count, $p );
-			$for_code[ ] = "\t{$vector_val}.push( {$next_vector_val} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:Array in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\t" . vector_list_parse( $data[ 'sub_id' ], $next_data_val, $next_vector_val, $count, $p );
+			$for_code[] = "\t{$vector_val}.push( {$next_vector_val} );\n";
+			$for_code[] = "}\n";
 			break;
 		case 'struct':
 			$struct = $GLOBALS[ 'all_protocol' ][ $data[ 'sub_id' ] ];
 			$vo_class = str_to_camel( $struct[ 'name' ] ) . '_DS';
 
-			$for_code[ ] = "for each( var {$next_data_val}:Array in {$data_val} )\n";
-			$for_code[ ] = "{\n";
-			$for_code[ ] = "\tvar tmp_{$vo_class}:{$vo_class} = new {$vo_class}();\n";
-			$for_code[ ] = "\ttmp_{$vo_class}.init( {$next_data_val} );\n";
-			$for_code[ ] = "\t{$vector_val}.push( tmp_{$vo_class} );\n";
-			$for_code[ ] = "}\n";
+			$for_code[] = "for each( var {$next_data_val}:Array in {$data_val} )\n";
+			$for_code[] = "{\n";
+			$for_code[] = "\tvar tmp_{$vo_class}:{$vo_class} = new {$vo_class}();\n";
+			$for_code[] = "\ttmp_{$vo_class}.init( {$next_data_val} );\n";
+			$for_code[] = "\t{$vector_val}.push( tmp_{$vo_class} );\n";
+			$for_code[] = "}\n";
 			break;
 	}
 	return join( $p, $for_code );
-}
-
-/**
- * 给AS3代码骆驼命名
- * @param string $str
- * @return string
- */
-function str_to_camel( $str )
-{
-	$arr = explode( '_', $str );
-	foreach( $arr as & $value )
-	{
-		$value = ucfirst( $value );
-	}
-	return join( '', $arr );
 }

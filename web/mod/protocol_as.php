@@ -57,8 +57,7 @@ function tool_protocol_as_interface( $base_path )
  */
 function tool_protocol_as_bin( $base_path )
 {
-	tool_protocol_as_util( 'all' );
-	tool_protocol_as_common( $GLOBALS[ 'main_pack' ] );
+	tool_protocol_as_common( 'com.yile.tkd.protocol.bin', true );
 	//所有的协议
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
 	{
@@ -112,7 +111,10 @@ function tool_as_protocol_struct_code( $pid, $rs, $items )
 		$str .= " implements ". join( ',', $extend_arr );
 	}
 	$str .= "\n\t{\n";
-	$str .= join( ";\n", $GLOBALS[ 'as_property_code' ][ $pid ] ) .";\n";
+	if ( !empty( $GLOBALS[ 'as_property_code' ][ $pid ] ) )
+	{
+		$str .= join( ";\n", $GLOBALS[ 'as_property_code' ][ $pid ] ) .";\n";
+	}
 	if ( !$rs[ 'is_sub' ] )
 	{
 		$str .= "\t\tprivate const _packtype:int = ". $rs[ 'struct_id' ] .";\n";
@@ -186,6 +188,7 @@ function tool_as_protocol_struct_code( $pid, $rs, $items )
 			}
 		}
 		$str .= "\t\t}\n";
+		$str .= tool_as_protocol_print( $items, $rs );
 	}
 	if ( $rs[ 'proto_type' ] & 2 )
 	{
@@ -234,8 +237,7 @@ function tool_as_protocol_struct_code( $pid, $rs, $items )
 		{
 			foreach ( $read_byte_after as $byte_name )
 			{
-				$str .= $tab_str ."buff.readShort();\n";
-				$str .= $tab_str ."this.". $byte_name ." = buff.readObject();\n";
+				$str .= $tab_str ."this.". $byte_name ." = Game.tool.readBytesArray( buff );\n";
 			}
 		}
 		//其它struct处理
@@ -255,10 +257,23 @@ function tool_as_protocol_struct_code( $pid, $rs, $items )
 			}
 		}
 		$str .= "\t\t}\n";
+		if ( !( $rs[ 'proto_type' ] & 1 ) )
+		{
+			$str .= tool_as_protocol_print( $items, $rs );
+		}
 	}
 	//生成paketype
 	if ( !$rs[ 'is_sub' ] )
 	{
+		if ( 2 == $rs[ 'proto_type' ] )
+		{
+			$str .= "\t\tpublic function get isWhiteList():Boolean\n";
+			$str .= "\t\t{\n";
+			$str .= "\t\t\treturn ";
+			$str .= isset( $rs[ 'is_write_list' ] ) ? 'true' : 'false';
+			$str .= ";\n";
+			$str .= "\t\t}\n";
+		}
 		$str .= "\t\tpublic function get packtype():int\n";
 		$str .= "\t\t{\n";
 		$str .= "\t\t\treturn _packtype;\n";
@@ -363,8 +378,7 @@ function tool_as_protocol_list_loop_parse( $list_id, $parent_var, $tab_str, $ran
 			$str .= $tab_str ."\t". $value_var .".read( buff );\n";
 		break;
 		case 'byte':
-			$str .= $tab_str ."\tbuff.readShort();\n";
-			$str .= $tab_str ."\tvar ". $value_var .":Object = buff.readObject();\n";
+			$str .= $tab_str ."\tvar ". $value_var .":ByteArray = Game.tool.readBytesArray( buff );\n";
 		break;
 		case 'list':
 			$str .= tool_as_protocol_list_loop_parse( $list_rs[ 'sub_id' ], $value_var, $tab_str ."\t", $rank + 1, $list_name );
@@ -383,13 +397,93 @@ function tool_as_protocol_list_loop_parse( $list_id, $parent_var, $tab_str, $ran
 }
 
 /**
+ * funcdoc
+ */
+function tool_as_protocol_print( $items, $rs )
+{
+	$tab_str = "\t\t\t";
+	$str = '';
+	$str .= "\t\tCONFIG::Debug\n";
+	$str .= "\t\t{\n";
+	$str .= "\t\tpublic function to_object( obj:Object ):void\n";
+	$str .= "\t\t{\n";
+	foreach ( $items as $item_rs )
+	{
+		$item_name = $item_rs[ 'item_name' ];
+		switch ( $item_rs[ 'type' ] )
+		{
+			case 'struct':
+				$sub_struct = 'sub_'. $item_name;
+				$str .= $tab_str ."var ". $sub_struct .":Object = {};\n";
+				$str .= $tab_str ."this.". $item_name .".to_object( ". $sub_struct ." );\n";
+				$str .= $tab_str ."obj[ '". $item_name ."' ] = ". $sub_struct .";\n";
+			break;
+			case 'list':
+				$str .= tool_as_protocol_print_list( $item_rs[ 'sub_id' ], $item_name, "obj[ '". $item_name ."' ]", 'this.'. $item_name, 0 );
+			break;
+			case 'byte':
+				$str .= $tab_str ."obj[ '". $item_name ."' ] = '[binary]';\n";
+			break;
+			default:
+				$str .= $tab_str ."obj[ '". $item_name ."' ] = this.". $item_name .";\n";
+			break;
+		}
+	}
+	$str .= "\t\t}\n";
+	$str .= "\t\tpublic function get_pack_desc():String\n";
+	$str .= "\t\t{\n";
+	$str .= "\t\t\treturn '". $rs[ 'desc' ] ."';\n";
+	$str .= "\t\t}\n";
+	$str .= "\t\t}\n";
+	return $str;
+}
+
+/**
+ * list打印
+ */
+function tool_as_protocol_print_list( $list_id, $item_name, $p_var, $value_var, $rank )
+{
+	$tab_str = str_repeat( "\t", $rank + 3 );
+	$list_rs = $GLOBALS[ 'all_list' ][ $list_id ];
+	$var_i = 'for_'. $item_name .'_'. $rank;
+	$str = '';
+	$arr_var = 'arr_'. $item_name .'_'. $rank;
+	$str .= $tab_str .'var '. $arr_var .":Array = [];\n";
+	$len_arr = 'len_'. $item_name .'_'. $rank;
+	$str .= $tab_str . 'var '. $len_arr . ":int = ". $value_var .".length;\n";
+	$str .= $tab_str ."for( var ". $var_i .":int = 0; ". $var_i ." < ". $len_arr ."; ++". $var_i ." )\n";
+	$str .= $tab_str ."{\n";
+	switch ( $list_rs[ 'type' ] )
+	{
+		case 'struct':
+			$obj_name = 'obj_'. $item_name .'_'. $rank;
+			$str .= $tab_str ."\tvar ". $obj_name .":Object = {};\n";
+			$str .= $tab_str ."\t". $value_var . '[ '. $var_i ." ].to_object( ". $obj_name ." );\n";
+			$str .= $tab_str ."\t". $arr_var .'.push( '. $obj_name ." );\n";
+		break;
+		case 'list':
+			$str .= tool_as_protocol_print_list( $list_rs[ 'sub_id' ], $item_name, $arr_var.'[ '. $var_i .' ]', $value_var .'[ '. $var_i .' ]', $rank + 1 );
+		break;
+		case 'byte':
+			$str .= $tab_str ."\t". $arr_var .".push( '[binary]' );\n";
+		break;
+		default:
+			$str .= $tab_str ."\t". $arr_var .'.push( '. $value_var .'[ '. $var_i ." ] );\n";
+		break;
+	}
+	$str .= $tab_str ."}\n";
+	$str .= $tab_str . $p_var . " = ". $arr_var .";\n";
+	return $str;
+}
+
+/**
  * 返回函数名
  */
 function tool_as_protocol_byte_arr_func( $type )
 {
 	switch ( $type )
 	{
-		case 'big int':
+		case 'bigint':
 			$func_str = 'writeDouble';
 		break;
 		case 'tinyint':
@@ -417,7 +511,7 @@ function tool_as_protocol_byte_arr_read_func( $type )
 {
 	switch ( $type )
 	{
-		case 'big int':
+		case 'bigint':
 			$func_str = 'readDouble';
 		break;
 		case 'tinyint':

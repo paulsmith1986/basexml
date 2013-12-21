@@ -2,7 +2,7 @@
 /**
  * 生成协议里的size define串
  */
-function tool_bin_protocol_encode_def( $side_type, $build_path )
+function tool_bin_protocol_encode_def( $side_type = 'server', $build_path )
 {
 	$encode_str = "#ifndef PROTOCOL_ENCODE_DATA_H\n#define PROTOCOL_ENCODE_DATA_H\n";
 	$decode_str = "#ifndef PROTOCOL_DECODE_DATA_H\n#define PROTOCOL_DECODE_DATA_H\n";
@@ -105,7 +105,7 @@ function tool_bin_protocol_encode_def( $side_type, $build_path )
 			$decode_str .= tool_tab_line( "_tmp_buff_pack.pool_size = ". $data_len .";", 1 );
 			$decode_str .= tool_tab_line( "_tmp_buff_pack.is_resize = 0;", 1 );
 			$decode_str .= tool_tab_line( "_tmp_buff_pack.data = ". $char_name .";", 1 );
-			$decode_str .= tool_tab_line( "protocol_recv_pack( fd, &_tmp_buff_pack );", 1 );
+			$decode_str .= tool_tab_line( "yile_net_get_data( fd, &_tmp_buff_pack );", 1 );
 			$decode_str .= tool_tab_line( "int ". $re_var_name ." = 0;", 1 );
 			$decode_str .= tool_tab_line( $var_type ." *var_name = NULL;", 1 );
 			$decode_str .= tool_tab_line( "if ( 0 == _tmp_buff_pack.max_pos )", 1 );
@@ -216,9 +216,8 @@ function tool_bin_protocol_task_dispatch( $side_type, $build_path )
 		$proto_type = 1;
 		$use_fd_info = false;
 	}
-	$def_str = "#ifndef FIRST_PROTOCOL_REQESUT_TASK_H\n#define FIRST_PROTOCOL_REQESUT_TASK_H\n";
-	$def_str .= "#include \"first_protocol.h\"\n";
-	$def_str .= "#include \"". $main_c .".h\"\n";
+	$def_str = "#ifndef YILE_PROTOCOL_REQESUT_TASK_H\n#define YILE_PROTOCOL_REQESUT_TASK_H\n";
+	$def_str .= "#include \"proto_bin.h\"\n";
 	$def_str .= "#include \"encode_". $side_type .".h\"\n";
 	$def_str .= "#include \"decode_". $side_type .".h\"\n";
 	$def_str .= "#include \"proto_size.h\"\n";
@@ -329,8 +328,8 @@ function tool_bin_protocol_task_dispatch( $side_type, $build_path )
 	$str .= "\t}\n";
 	$str .= "\treturn 0;\n";
 	$str .= "}\n";
-	$h_file = $build_path .'/task_'. $side_type .'.h';
-	$c_file = $build_path .'/task_'. $side_type .'.c';
+	$h_file = $build_path. '/task_'. $side_type .'.h';
+	$c_file = $build_path. '/task_'. $side_type .'.c';
 	file_put_contents( $c_file, "#include \"task_". $side_type .".h\"\n" . $str );
 	echo "生成任务派发文件:", $c_file, "\n";
 	echo "生成任务派发文件头文件:", $h_file, "\n";
@@ -342,11 +341,11 @@ function tool_bin_protocol_task_dispatch( $side_type, $build_path )
  */
 function tool_bin_protocol_head( $type )
 {
-	$def_var = "FIRST_PROTOCOL_". strtoupper( $type ) ."_H";
+	$def_var = "YILE_PROTOCOL_". strtoupper( $type ) ."_H";
 	$protocol_h = "#ifndef ". $def_var ."\n#define ". $def_var ."\n";
 	$protocol_h .= "#include <stdint.h>\n";
 	$protocol_h .= "#include <stdlib.h>\n";
-	$protocol_h .= "#include \"first_protocol.h\"\n";
+	$protocol_h .= "#include \"yile_protocol.h\"\n";
 	$protocol_h .= "#pragma pack(1)\n";
 	$protocol_h .= join( '', $GLOBALS[ 'typedef_all' ] );
 	$protocol_h .= join( '', $GLOBALS[ 'typedef_detail' ] );
@@ -408,8 +407,8 @@ function tool_bin_protocol_server( $build_path, $server_xml, $extend_protocol = 
 		}
 	}
 	$head_str = tool_bin_protocol_head( 'server' );
-	$h_file = $build_path .'/proto_bin.h';
-	$c_file = $build_path .'/proto_bin.c';
+	$h_file = $build_path. '/proto_bin.h';
+	$c_file = $build_path. '/proto_bin.c';
 	$c_code = "#include \"proto_bin.h\"\n". join( '', $GLOBALS[ 'struct_code' ] );
 	$c_code .= join( '', $GLOBALS[ 'parse_struct_code' ] );
 	$c_code .= join( '', $GLOBALS[ 'size_func_code' ] );
@@ -427,9 +426,9 @@ function tool_bin_protocol_server( $build_path, $server_xml, $extend_protocol = 
 /**
  * 生成二进制协议 客户端
  */
-function tool_bin_protocol_client( $build_path, $xml_path )
+function tool_bin_protocol_client( $build_path, $client_xml, $extend_protocol = array() )
 {
-	tool_protocol_xml( $xml_path, 'all' );
+	tool_protocol_xml( $client_xml, 'all', $extend_protocol );
 	tool_bin_protocol_common( );
 	$GLOBALS[ 'parse_struct_define' ] = array();
 	$GLOBALS[ 'struct_code' ] = array();
@@ -467,8 +466,8 @@ function tool_bin_protocol_client( $build_path, $xml_path )
 		}
 	}
 	$head_str = tool_bin_protocol_head( 'client' );
-	$h_file = $build_path .'/proto_c.h';
-	$c_file = $build_path .'/proto_c.c';
+	$h_file = $build_path. '/proto_c.h';
+	$c_file = $build_path. '/proto_c.c';
 	$c_code = "#include \"proto_c.h\"\n". join( '', $GLOBALS[ 'struct_code' ] );
 	$c_code .= join( '', $GLOBALS[ 'parse_struct_code' ] );
 	$c_code .= join( '', $GLOBALS[ 'size_func_code' ] );
@@ -508,13 +507,13 @@ function tool_bin_protocol_struct_code( $pid, $rs, $items )
 	{
 		if ( $rs[ 'is_sub' ] )
 		{
-			show_error( 'struct '. $rs[ 'name' ] .' 为空' );
+			show_excp( 'struct '. $rs[ 'name' ] .' 为空' );
 		}
 		$str .= "\tall_result->pos = 0;\n";
 		$str .= "\tpacket_head_t packet_info;\n";
 		$str .= "\tpacket_info.size = 0;\n";
 		$str .= "\tpacket_info.pack_id = ". $rs[ 'struct_id' ] .";\n";
-		$str .= "\tfirst_result_push_data( all_result, &packet_info, sizeof( packet_head_t ) );\n";
+		$str .= "\tyile_result_push_data( all_result, &packet_info, sizeof( packet_head_t ) );\n";
 	}
 	else
 	{
@@ -525,11 +524,11 @@ function tool_bin_protocol_struct_code( $pid, $rs, $items )
 			$str .= "\tall_result->pos = 0;\n";
 			$str .= "\tpacket_head_t packet_info;\n";
 			$str .= "\tpacket_info.pack_id = ". $rs[ 'struct_id' ] .";\n";
-			$str .= "\tfirst_result_push_data( all_result, NULL, sizeof( packet_head_t ) );\n";
+			$str .= "\tyile_result_push_data( all_result, NULL, sizeof( packet_head_t ) );\n";
 		}
 		if ( $GLOBALS[ 'is_sizeof_struct_fix' ][ $pid ] )
 		{
-			$str .= "\tfirst_result_push_data( all_result, data_arr, sizeof( ". $proto_name_var ."_t ) );\n";
+			$str .= "\tyile_result_push_data( all_result, data_arr, sizeof( ". $proto_name_var ."_t ) );\n";
 		}
 		else
 		{
@@ -550,7 +549,7 @@ function tool_bin_protocol_struct_code( $pid, $rs, $items )
 						$read_byte_after[] = $item_rs[ 'item_name' ];
 					break;
 					default:
-						$str .= "\tfirst_result_push_data( all_result, &data_arr->". $item_rs[ 'item_name' ] .", sizeof( data_arr->". $item_rs[ 'item_name' ] ." ) );\n";
+						$str .= "\tyile_result_push_data( all_result, &data_arr->". $item_rs[ 'item_name' ] .", sizeof( data_arr->". $item_rs[ 'item_name' ] ." ) );\n";
 					break;
 				}
 			}
@@ -612,7 +611,7 @@ function tool_bin_protocol_list_loop( $list_id, $p_list_var, $tab_str, $rank )
 	{
 		$str .= $tab_str ."int ". $for_var .";";
 	}
-	$str .= $tab_str ."first_result_push_data( all_result, &". $p_list_var ."len, sizeof( ". $p_list_var ."len ) );\n";
+	$str .= $tab_str ."yile_result_push_data( all_result, &". $p_list_var ."len, sizeof( ". $p_list_var ."len ) );\n";
 	$str .= $tab_str ."for( ". $for_var ." = 0; ". $for_var ." < ". $p_list_var ."len; ++". $for_var ." )\n";
 	$str .= $tab_str ."{\n";
 	switch ( $list_rs[ 'type' ] )
@@ -636,11 +635,11 @@ function tool_bin_protocol_list_loop( $list_id, $p_list_var, $tab_str, $rank )
 			$char_name = "tmp_char";
 			$str .= $tab_str ."\tchar ". $char_name ."[ ". $list_rs[ 'char_len' ] ." ];\n";
 			$str .= $tab_str ."\twrite_fix_char( ". $p_list_var ."item[ ". $for_var ." ], ". $char_name .", ". $list_rs[ 'char_len' ] ." );\n";
-			$str .= $tab_str ."\tfirst_result_push_data( all_result, ". $char_name .", sizeof( ". $char_name ." ) );\n";
+			$str .= $tab_str ."\tyile_result_push_data( all_result, ". $char_name .", sizeof( ". $char_name ." ) );\n";
 		break;
 		default:
 			$int_type = $GLOBALS[ 'all_type_arr' ][ $list_rs[ 'type' ] ];
-			$str .= $tab_str ."\tfirst_result_push_data( all_result, &". $p_list_var ."item[ ". $for_var ." ], sizeof( ". $p_list_var ."item[ ". $for_var ." ] ) );\n";
+			$str .= $tab_str ."\tyile_result_push_data( all_result, &". $p_list_var ."item[ ". $for_var ." ], sizeof( ". $p_list_var ."item[ ". $for_var ." ] ) );\n";
 		break;
 	}
 	$str .= $tab_str ."}\n";
@@ -853,7 +852,7 @@ function tool_bin_protocol_struct_print_code( $pid, $rs, $items )
 	{
 		$print_head_char .= ", int rank";
 	}
-	$print_head_char .= ")";
+	$print_head_char .= " )";
 	$GLOBALS[ 'print_func_define' ][] = $print_head_char .";\n";
 	$str = $print_head_char ."\n{\n";
 	if ( !$rs[ 'is_sub' ] )
@@ -861,7 +860,7 @@ function tool_bin_protocol_struct_print_code( $pid, $rs, $items )
 		$str .= "\tint rank = 0;\n";
 	}
 	$str .= "\tchar prefix_char[ MAX_LIST_RECURSION * 4 + 1 ];\n";
-	$str .= "\tfirst_printf_tab_string( prefix_char, rank );\n";
+	$str .= "\tyile_printf_tab_string( prefix_char, rank );\n";
 	$str .= "\tprintf( \"". $rs[ 'name' ] ."\\n\" );\n";
 	$str .= "\tprintf( \"%s(\\n\", prefix_char );\n";
 	$list_num = 0;
@@ -880,7 +879,7 @@ function tool_bin_protocol_struct_print_code( $pid, $rs, $items )
 					$str .= "\tint print_i1;\n";
 				}
 				$str .= "\tprintf( \"List\\n\" );\n";
-				$str .= tool_protocol_print_list( $item_rs[ 'sub_id' ], "re->". $item_rs[ 'item_name' ]."->", 1 );
+				$str .= tool_yile_protocol_print_list( $item_rs[ 'sub_id' ], "re->". $item_rs[ 'item_name' ]."->", 1 );
 			break;
 			case 'byte':
 				$str .= "\tprintf( \"[Blob %d]\\n\", re->". $item_rs[ 'item_name' ] ."->len );\n";
@@ -916,7 +915,7 @@ function tool_bin_protocol_struct_print_code( $pid, $rs, $items )
 /**
  * 打印List
  */
-function tool_protocol_print_list( $list_id, $p_var, $rank )
+function tool_yile_protocol_print_list( $list_id, $p_var, $rank )
 {
 	$tab_str = str_repeat( "\t", $rank );
 	$tab_str_c = str_repeat( "    ", $rank );
@@ -936,11 +935,11 @@ function tool_protocol_print_list( $list_id, $p_var, $rank )
 	{
 		case 'struct':
 			$struct_rs = $GLOBALS[ 'all_protocol' ][ $list_rs[ 'sub_id' ] ];
-			$str .= $tab_str. "\tprint_". $struct_rs[ 'name' ] ."( &". $p_var ."item[ ". $var_i ." ], rank + 2 );\n";
+			$str .= $tab_str. "\tprint_". $struct_rs[ 'name' ] ."( &". $p_var ."item[ ". $var_i ." ], ". ( $rank + 1 ) ." );\n";
 		break;
 		case 'list':
 			$str .= $tab_str ."\tprintf( \" List\\n\" );\n";
-			$str .= tool_protocol_print_list( $list_rs[ 'sub_id' ], $p_var ."item[ ". $var_i ." ].", $rank + 1 );
+			$str .= tool_yile_protocol_print_list( $list_rs[ 'sub_id' ], $p_var ."item[ ". $var_i ." ].", $rank + 1 );
 		break;
 		case 'byte':
 			$str .= $tab_str ."\tprintf( \"[Blob %d]\\n\", ". $p_var ."item[ ". $var_i ." ].len );\n";

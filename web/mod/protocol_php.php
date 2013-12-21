@@ -1,11 +1,14 @@
 <?php
 /**
- * 模拟数据
+ * PHP协议文件生成
  */
-function tool_protocol_php_simulate( $build_path, $is_simulate = true, $is_dispatch = false )
+function tool_protocol_php_build( $build_path, $is_simulate = true, $is_dispatch = false, $arg = array() )
 {
+	$need_base64 = isset( $arg[ 'need_base64' ] ) ? $arg[ 'need_base64' ] : true;
+	$unpack_mod = isset( $arg[ 'unpack_mod' ] ) ? $arg[ 'unpack_mod' ] : 3;
+	$file_name = isset( $arg[ 'file_name' ] ) ? $arg[ 'file_name' ] : 'proto_simulate.php';
 	$str = "<?php\n";
-	$str .= tool_protocol_unpack_dispatch( $is_simulate, $is_dispatch );
+	$str .= tool_protocol_unpack_dispatch( $is_simulate, $unpack_mod, $need_base64, $is_dispatch );
 	if ( $is_simulate )
 	{
 		foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
@@ -36,7 +39,7 @@ function tool_protocol_php_simulate( $build_path, $is_simulate = true, $is_dispa
 					case 'list':
 						$var_name = '$arr_'. $item_name;
 						$str .= tool_line( $var_name .' = array();', 1 );
-						$str .= tool_protocol_php_simulate_list( $item_rs[ 'sub_id' ], $var_name, 1 );
+						$str .= tool_protocol_php_build_list( $item_rs[ 'sub_id' ], $var_name, 1 );
 						$str .= tool_line( '$data[ "'. $item_name .'" ] = '. $var_name .';', 1 );
 					break;
 					case 'struct':
@@ -52,22 +55,31 @@ function tool_protocol_php_simulate( $build_path, $is_simulate = true, $is_dispa
 			$str .= tool_line( '}' );
 		}
 	}
-	$str .= tool_protocol_simulate_pack();
-	$str .= tool_protocol_simulate_unpack();
-	$str .= tool_protocol_unpack_func();
+	$pack_mod = isset( $arg[ 'pack_mod' ] ) ? $arg[ 'pack_mod' ] : 3;
+
+	if ( !isset( $arg[ 'no_pack' ] ) )
+	{
+		$str .= tool_protocol_php_pack( $pack_mod, $need_base64 );
+		$str .= tool_protocol_pack_dispatch( $pack_mod );
+	}
+	if ( !isset( $arg[ 'no_unpack' ] ) )
+	{
+		$str .= tool_protocol_php_unpack( $unpack_mod );
+		$str .= tool_protocol_unpack_func();
+	}
 	if ( $is_simulate )
 	{
-		$str .= tool_protocol_simulate_func();
+		$str .= tool_protocol_php_simulate_func();
 	}
-	$file = $build_path .'/proto_simulate.php';
+	$file = $build_path . $file_name;
 	file_put_contents( $file, $str );
-	echo '生成模拟数据和调试文件:'. $file ."\n";
+	echo '生成PHP协议文件:'. $file ."\n";
 }
 
 /**
- * 数据模拟list
+ * PHP协议处理list
  */
-function tool_protocol_php_simulate_list( $list_id, $parent, $rank = 1 )
+function tool_protocol_php_build_list( $list_id, $parent, $rank = 1 )
 {
 	$str = '';
 	$for_i = '$i_'. $rank;
@@ -92,7 +104,7 @@ function tool_protocol_php_simulate_list( $list_id, $parent, $rank = 1 )
 		case 'list':
 			$arr_name = '$arr_'. $rank;
 			$str .= tool_line( $arr_name .' = array();', $rank + 1 );
-			$str .= tool_protocol_php_simulate_list( $list_rs[ 'sub_id' ], $arr_name, $rank + 1 );
+			$str .= tool_protocol_php_build_list( $list_rs[ 'sub_id' ], $arr_name, $rank + 1 );
 			$str .= tool_line( $parent .'[] = '. $arr_name .';', $rank + 1 );
 		break;
 		default:
@@ -104,13 +116,17 @@ function tool_protocol_php_simulate_list( $list_id, $parent, $rank = 1 )
 }
 
 /**
- * 将模拟数据打包
+ * 打包
  */
-function tool_protocol_simulate_pack( )
+function tool_protocol_php_pack( $pack_mod, $need_base64 )
 {
 	$str = "\n";
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
 	{
+		if ( !( $pack_mod & $rs[ 'proto_type' ] ) )
+		{
+			continue;
+		}
 		$read_struct_after = array( );
 		$read_list_after = array( );
 		$read_string_after = array();
@@ -121,14 +137,14 @@ function tool_protocol_simulate_pack( )
 		$str .= tool_line( ' * 打包数据 '. $rs[ 'desc' ] );
 		$str .= tool_line( ' */' );
 		$func_str = 'function proto_pack_'. $struct_name .'( $data';
-		if ( !$rs[ 'is_sub' ] )
+		if ( !$rs[ 'is_sub' ] && $need_base64 )
 		{
-			$func_str .= ', $is_hex = true';
+			$func_str .= ', $base64 = false';
 		}
 		$func_str .= ' )';
 		$str .= tool_line( $func_str );
 		$str .= tool_line( '{' );
-		$str .= tool_line( '$bin_str = "";', 1 );
+		$str .= tool_line( '$bin_str = \'\';', 1 );
 		foreach ( $items as $item_rs )
 		{
 			$item_type = $item_rs[ 'type' ];
@@ -201,10 +217,13 @@ function tool_protocol_simulate_pack( )
 		{
 			$str .= tool_line( '$head_str = pack( "LS", strlen( $bin_str ), '. $rs[ 'struct_id' ] .' );', 1 );
 			$str .= tool_line( '$bin_str = $head_str . $bin_str;', 1 );
-			$str .= tool_line( 'if( $is_hex )', 1 );
-			$str .= tool_line( '{', 1 );
-			$str .= tool_line( '$bin_str = base64_encode( $bin_str );', 2 );
-			$str .= tool_line( '}', 1 );
+			if ( $need_base64 )
+			{
+				$str .= tool_line( 'if( $base64 )', 1 );
+				$str .= tool_line( '{', 1 );
+				$str .= tool_line( '$bin_str = base64_encode( $bin_str );', 2 );
+				$str .= tool_line( '}', 1 );
+			}
 		}
 		$str .= tool_line( 'return $bin_str;', 1 );
 		$str .= tool_line( '}' );
@@ -252,19 +271,29 @@ function tool_protocol_simulate_pack_list( $list_id, $parent_data, $rank )
 /**
  * 生成dispatch
  */
-function tool_protocol_unpack_dispatch( $is_simulate, $is_dispatch = false )
+function tool_protocol_unpack_dispatch( $is_simulate, $unpack_mod, $need_base64, $is_dispatch = false )
 {
 	$proto_list = array();
 	$str = '';
 	$str .= tool_line( '/**' );
 	$str .= tool_line( ' * 解包路由' );
 	$str .= tool_line( ' */' );
-	$str .= tool_line( 'function proto_unpack_data( $byte_data, $is_hex = true )' );
+	$empty_protocol = array();
+	$tmp_line = 'function proto_unpack_data( $byte_data';
+	if ( $need_base64 )
+	{
+		$tmp_line .= ', $base64 = false';
+	}
+	$tmp_line .= ' )';
+	$str .= tool_line( $tmp_line );
 	$str .= tool_line( '{' );
-	$str .= tool_line( 'if( $is_hex )', 1 );
-	$str .= tool_line( '{', 1 );
-	$str .= tool_line( '$byte_data = base64_decode( $byte_data );', 2 );
-	$str .= tool_line( '}', 1 );
+	if ( $need_base64 )
+	{
+		$str .= tool_line( 'if( $base64 )', 1 );
+		$str .= tool_line( '{', 1 );
+		$str .= tool_line( '$byte_data = base64_decode( $byte_data );', 2 );
+		$str .= tool_line( '}', 1 );
+	}
 	$str .= tool_line( '$bin_len = strlen( $byte_data );', 1 );
 	$str .= tool_line( '$head_len = 6;', 1 );
 	$str .= tool_line( 'if( $bin_len < $head_len )', 1 );
@@ -282,13 +311,29 @@ function tool_protocol_unpack_dispatch( $is_simulate, $is_dispatch = false )
 	$str .= tool_line( '{', 1 );
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
 	{
-		if ( $rs[ 'is_sub' ] )
+		if ( $rs[ 'is_sub' ] || !( $unpack_mod & $rs[ 'proto_type' ] ) )
 		{
 			continue;
 		}
 		$proto_list[ $rs[ 'name' ] ] = $rs[ 'desc' ] . ' 【'. $rs[ 'struct_id' ] .'】';
-		$str .= tool_line( 'case '. $rs[ 'struct_id' ] .':', 2 );
-		$str .= tool_line( '$data = proto_unpack_'. $rs[ 'name' ] .'( $bin_str );', 3 );
+		if ( empty( $GLOBALS[ 'all_protocol_item' ][ $pid ] ) )
+		{
+			$empty_protocol[] = $rs[ 'struct_id' ];
+		}
+		else
+		{
+			$str .= tool_line( 'case '. $rs[ 'struct_id' ] .':', 2 );
+			$str .= tool_line( '$data = proto_unpack_'. $rs[ 'name' ] .'( $bin_str );', 3 );
+			$str .= tool_line( 'break;', 2 );
+		}
+	}
+	if ( !empty( $empty_protocol ) )
+	{
+		foreach ( $empty_protocol as $pid )
+		{
+			$str .= tool_line( 'case '. $pid .':', 2 );
+		}
+		$str .= tool_line( '$data = null;', 3 );
 		$str .= tool_line( 'break;', 2 );
 	}
 	$str .= tool_line( 'default:', 2 );
@@ -313,18 +358,60 @@ function tool_protocol_unpack_dispatch( $is_simulate, $is_dispatch = false )
 }
 
 /**
+ * 生成pack的dispatch
+ */
+function tool_protocol_pack_dispatch( $pack_mod )
+{
+	$proto_list = array();
+	$str = '';
+	$str .= tool_line( '/**' );
+	$str .= tool_line( ' * pack路由' );
+	$str .= tool_line( ' */' );
+	$tmp_line = 'function proto_pack_data( $pack_id, $data )';
+	$str .= tool_line( $tmp_line );
+	$str .= tool_line( '{' );
+	$str .= tool_line( 'switch( $pack_id )', 1 );
+	$str .= tool_line( '{', 1 );
+	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
+	{
+		if ( $rs[ 'is_sub' ] || !( $pack_mod & $rs[ 'proto_type' ] ) )
+		{
+			continue;
+		}
+		$str .= tool_line( 'case '. $rs[ 'struct_id' ] .':', 2 );
+		$str .= tool_line( '$data = proto_pack_'. $rs[ 'name' ] .'( $data );', 3 );
+		$str .= tool_line( 'break;', 2 );
+	}
+	$str .= tool_line( 'default:', 2 );
+	$str .= tool_line( 'throw new Exception( "Unkown pack_id:". $pack_id ."\n", 60002 );', 3 );
+	$str .= tool_line( 'break;', 2 );
+	$str .= tool_line( '}', 1 );
+	$str .= tool_line( 'return $data;' );
+	$str .= tool_line( '}' );
+	return $str;
+}
+
+/**
  * 解包
  */
-function tool_protocol_simulate_unpack( )
+function tool_protocol_php_unpack( $pack_mod )
 {
 	$str = "\n";
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
 	{
+		if ( !( $pack_mod & $rs[ 'proto_type' ] ) )
+		{
+			continue;
+		}
 		$read_struct_after = array( );
 		$read_list_after = array( );
 		$read_string_after = array();
 		$read_byte_after = array();
 		$items = $GLOBALS[ 'all_protocol_item' ][ $pid ];
+		if ( empty( $items ) && !$rs[ 'is_sub' ] )
+		{
+			continue;
+		}
 		$struct_name = strtolower( $rs[ 'name' ] );
 		$str .= tool_line( '/**' );
 		$str .= tool_line( ' * 解包数据 '. $rs[ 'desc' ] );
@@ -339,7 +426,7 @@ function tool_protocol_simulate_unpack( )
 		$str .= tool_line( '{' );
 		$upack_str = '';
 		$pos = 0;
-		if ( !$rs[ 'is_sub' ] )
+		if ( !$rs[ 'is_sub' ] && !$GLOBALS[ 'is_sizeof_struct_fix' ][ $pid ] )
 		{
 			$str .= tool_line( '$unpack_pos = 0;', 1 );
 		}
@@ -364,7 +451,7 @@ function tool_protocol_simulate_unpack( )
 				}
 				$upack_str .= $item_rs[ 'item_name' ] .'/';
 			}
-			$str .= tool_line( '$result = unpack( "'. $upack_str .'", substr( $bin_str, $unpack_pos ) );', 1 );
+			$str .= tool_line( '$result = unpack( "'. $upack_str .'", $bin_str );', 1 );
 			if ( $rs[ 'is_sub' ] )
 			{
 				$str .= tool_line( '$unpack_pos += '. $pos .';', 1 );
@@ -449,7 +536,7 @@ function tool_protocol_simulate_unpack( )
 			{
 				foreach ( $read_list_after as $list_name => $list_id )
 				{
-					$str .= tool_protocol_simulate_unpack_list( $list_id, '$result[ "'. $list_name .'" ]', 1 );
+					$str .= tool_protocol_php_unpack_list( $list_id, '$result[ "'. $list_name .'" ]', 1 );
 				}
 			}
 		}
@@ -462,7 +549,7 @@ function tool_protocol_simulate_unpack( )
 /**
  * 解list包
  */
-function tool_protocol_simulate_unpack_list( $list_id, $parent, $rank )
+function tool_protocol_php_unpack_list( $list_id, $parent, $rank )
 {
 	$list_rs = $GLOBALS[ 'all_list' ][ $list_id ];
 	$str = '';
@@ -509,7 +596,7 @@ function tool_protocol_simulate_unpack_list( $list_id, $parent, $rank )
 				$str .= tool_line( $result_arr .'[] = proto_unpack_'. $struct[ 'name' ] .'( $bin_str, $unpack_pos );', $rank + 1 );
 			break;
 			case 'list':
-				$str .= tool_protocol_simulate_unpack_list( $list_rs[ 'sub_id' ], $result_arr .'[ '. $for_var .' ]', $rank + 1 );
+				$str .= tool_protocol_php_unpack_list( $list_rs[ 'sub_id' ], $result_arr .'[ '. $for_var .' ]', $rank + 1 );
 			break;
 			default:
 				$char_type = tool_protocol_pack_int( $list_rs[ 'type' ], $len );
@@ -576,7 +663,7 @@ function tool_protocol_pack_int( $type, &$len = 0 )
 /**
  * 功能函数代码
  */
-function tool_protocol_simulate_func()
+function tool_protocol_php_simulate_func()
 {
 	$str = '';
 	$str .= tool_line( '/**' );

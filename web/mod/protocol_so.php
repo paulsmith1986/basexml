@@ -60,6 +60,7 @@ function tool_so_protocol_send_switch( $xml_path, $file_name, $type = 1 )
 		$str .= tool_tab_line( "break;", 2 );
 	}
 	$str .= tool_tab_line( "default:", 2 );
+	$str .= tool_tab_line( "_tmp_protocol_pack.error_code = PROTO_UNKOWN_PACK;", 3 );
 	$str .= tool_tab_line( "zend_error( E_WARNING, \"Unkown pack_id:%d\", pack_id );", 3 );
 	$str .= tool_tab_line( "break;", 2 );
 	$str .= tool_tab_line( "}", 1 );
@@ -143,7 +144,7 @@ function tool_so_protocol_decode_switch( $xml_path, $file_name, $type = 2 )
 	$str .= "#define ". $def_name ."\n";
 	tool_protocol_xml( $xml_path, 'all' );
 	$str .= "//解包数据成php数组\n";
-	$str .= tool_tab_line( "#define php_unpack_protocol_data( pack_id, data_arr, re_value )" );
+	$str .= tool_tab_line( "#define php_unpack_protocol_data( pack_id, data_arr, tmp_result )" );
 	$str .= tool_tab_line( "switch( pack_id )", 1 );
 	$str .= tool_tab_line( "{", 1 );
 	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
@@ -158,7 +159,7 @@ function tool_so_protocol_decode_switch( $xml_path, $file_name, $type = 2 )
 		}
 		$str .= tool_tab_line( "case ". $rs[ 'struct_id' ] .":", 2 );
 		$str .= tool_tab_line( "{", 2 );
-		$str .= tool_tab_line( "soread_". $rs[ 'name' ] ."( data_arr, re_value );", 3 );
+		$str .= tool_tab_line( "soread_". $rs[ 'name' ] ."( data_arr, tmp_result );", 3 );
 		$str .= tool_tab_line( "}", 2 );
 		$str .= tool_tab_line( "break;", 2 );
 	}
@@ -170,17 +171,18 @@ function tool_so_protocol_decode_switch( $xml_path, $file_name, $type = 2 )
 	file_put_contents( $file_name, $str );
 	echo '生成so_decode文件:', $file_name, "\n";
 }
-
 /**
  * 生成h文件
  */
 function tool_so_protocol_head_file()
 {
-	$protocol_h = "#ifndef FIRST_NEW_GAME_PROTOCOL_SO_H\n#define FIRST_NEW_GAME_PROTOCOL_SO_H\n";
+	$protocol_h = "#ifndef YGP_PROTOCOL_SO_H\n#define YGP_PROTOCOL_SO_H\n";
 	$protocol_h .= "#include <stdint.h>\n";
 	$protocol_h .= "#include <stdlib.h>\n";
-	$protocol_h .= "#include \"first_proto.h\"\n";
+	$protocol_h .= "#include \"yile_proto.h\"\n";
 	$protocol_h .= "#include \"php.h\"\n";
+	$protocol_h .= "#include \"encode_client.h\"\n";
+	$protocol_h .= "#include \"decode_client.h\"\n";
 	$protocol_h .= "#include \"proto_size.h\"\n";
 	$protocol_h .= "#pragma pack(1)\n";
 	$protocol_h .= join( '', $GLOBALS[ 'typedef_all' ] );
@@ -192,48 +194,6 @@ function tool_so_protocol_head_file()
 	$protocol_h .= join( '', $GLOBALS[ 'parse_php_struct_define' ] );
 	$protocol_h .= "#endif";
 	return $protocol_h;
-}
-
-/**
- * 生成name_id的map
- */
-function tool_so_id_name_map( $type = 2 )
-{
-	$id_map_list = array();
-	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
-	{
-		if ( $info[ 'is_sub' ] )
-		{
-			continue;
-		}
-		if ( !( $info[ 'proto_type' ] & $type ) )
-		{
-			continue;
-		}
-		$id_map_list[ $info[ 'struct_id' ] ] = $pid;
-	}
-	return var_export( $id_map_list, true );
-}
-
-/**
- * 生成id=>name的map
- */
-function tool_so_name_id_map( $type = 2 )
-{
-	$name_id_map = array();
-	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
-	{
-		if ( $info[ 'is_sub' ] )
-		{
-			continue;
-		}
-		if ( !( $info[ 'proto_type' ] & $type ) )
-		{
-			continue;
-		}
-		$name_id_map[ $pid ] = (int)$info[ 'struct_id' ];
-	}
-	return var_export( $name_id_map, true );
 }
 
 /**
@@ -255,13 +215,13 @@ function tool_so_protocol( $build_path, $xml_path )
 		{
 			continue;
 		}
-		//请求
+		//请求协议
 		if ( $rs[ 'proto_type' ] & 1 )
 		{
 			$code = tool_so_protocol_struct_code( $pid, $rs, $items );
 			$GLOBALS[ 'php_struct_code' ][] = $code;
 		}
-		//返回
+		//解析协议
 		if ( $rs[ 'proto_type' ] & 2 )
 		{
 			$parse_code = tool_so_protocol_struct_parse_code( $pid, $rs, $items );
@@ -298,11 +258,11 @@ function tool_so_protocol_struct_code( $pid, $rs, $items )
 	if ( !$rs[ 'is_sub' ] )
 	{
 		//$GLOBALS[ 'struct_define' ][] = "#define write_". $rs[ 'name' ] ."( a, b ) ". $rs[ 'name' ] ."( a, b, NULL )";
-		$str .= "\tint old_result_pos = all_result->pos;\n";
+		$str .= "\tall_result->pos = 0;\n";
 		$str .= "\tpacket_head_t packet_info;\n";
 		$str .= "\tpacket_info.size = 0;\n";
 		$str .= "\tpacket_info.pack_id = ". $rs[ 'struct_id' ] .";\n";
-		$str .= "\tfirst_result_push_data( all_result, NULL, sizeof( packet_head_t ) );\n";
+		$str .= "\tyile_result_push_data( all_result, NULL, sizeof( packet_head_t ) );\n";
 	}
 
 	//如果全是定长型
@@ -321,7 +281,7 @@ function tool_so_protocol_struct_code( $pid, $rs, $items )
 				$str .= "\tread_int_from_hash( ". $proto_name_var .", ". $item_name ." );\n";
 			}
 		}
-		$str .= "\tfirst_result_push_data( all_result, &". $proto_name_var .", sizeof( ". $proto_name_var ."_t ) );\n";
+		$str .= "\tyile_result_push_data( all_result, &". $proto_name_var .", sizeof( ". $proto_name_var ."_t ) );\n";
 	}
 	else
 	{
@@ -346,7 +306,7 @@ function tool_so_protocol_struct_code( $pid, $rs, $items )
 					$char_name = "c_". $item_name;
 					$str .= "\tchar ". $char_name ."[ ". $item_rs[ 'char_len' ] ." ];\n";
 					$str .= "\tread_fixchar_from_hash( ". $proto_name_var .", ". $item_name .", ". $char_name .", ". $item_rs[ 'char_len' ] ." );\n";
-					$str .= "\tfirst_result_push_data( all_result, &". $char_name .", sizeof( ". $char_name ." ) );\n";
+					$str .= "\tyile_result_push_data( all_result, &". $char_name .", sizeof( ". $char_name ." ) );\n";
 				break;
 				default:
 					$int_type = $GLOBALS[ 'all_type_arr' ][ $item_rs[ 'type' ] ];
@@ -357,7 +317,7 @@ function tool_so_protocol_struct_code( $pid, $rs, $items )
 						$str .= "\t". $int_type ." ". $int_var_name .";\n";
 					}
 					$str .= "\tread_int_from_hash_var( ". $proto_name_var .", ". $int_var_name .", ". $item_name ." );\n";
-					$str .= "\tfirst_result_push_data( all_result, &". $int_var_name .", sizeof( ". $int_var_name ." ) );\n";
+					$str .= "\tyile_result_push_data( all_result, &". $int_var_name .", sizeof( ". $int_var_name ." ) );\n";
 				break;
 			}
 		}
@@ -404,8 +364,8 @@ function tool_so_protocol_struct_code( $pid, $rs, $items )
 	}
 	if ( !$rs[ 'is_sub' ] )
 	{
-		$str .= "\tpacket_info.size = all_result->pos - old_result_pos - sizeof( packet_head_t );\n";
-		$str .= "\tmemcpy( all_result->str + old_result_pos, &packet_info, sizeof( packet_head_t ) );\n";
+		$str .= "\tpacket_info.size = all_result->pos - sizeof( packet_head_t );\n";
+		$str .= "\tmemcpy( all_result->str, &packet_info, sizeof( packet_head_t ) );\n";
 	}
 	$str .= "}\n";
 	return $str;
@@ -429,8 +389,8 @@ function tool_so_protocol_list_loop( $list_id, $p_list_hash, $tab_str, $rank )
 	}
 	$list_type = str_replace( '*', '', $GLOBALS[ 'all_type_arr' ][ 'list_'. $list_id ] );
 	$str .= $tab_str .$len_var." = zend_hash_num_elements( ". $p_list_hash ." );\n";
-	$str .= $tab_str ."first_result_push_data( all_result, &". $len_var .", sizeof( ". $len_var ." ) );\n";
-	$str .= $tab_str ."for( first_loop_arr( ". $p_list_hash .", ". $pointer_var .", ". $z_item_var ." ) )\n";
+	$str .= $tab_str ."yile_result_push_data( all_result, &". $len_var .", sizeof( ". $len_var ." ) );\n";
+	$str .= $tab_str ."for( yile_loop_arr( ". $p_list_hash .", ". $pointer_var .", ". $z_item_var ." ) )\n";
 	$str .= $tab_str ."{\n";
 	switch ( $list_rs[ 'type' ] )
 	{
@@ -463,7 +423,7 @@ function tool_so_protocol_list_loop( $list_id, $p_list_hash, $tab_str, $rank )
 			$int_var = "tmp_var". $rank;
 			$str .= $tab_str ."\t". $int_type ." ". $int_var .";\n";
 			$str .= $tab_str ."\tread_int_from_zval( ". $z_item_var .", ". $int_var ." );\n";
-			$str .= $tab_str ."\tfirst_result_push_data( all_result, &". $int_var .", sizeof( ". $int_var ." ) );\n";
+			$str .= $tab_str ."\tyile_result_push_data( all_result, &". $int_var .", sizeof( ". $int_var ." ) );\n";
 		break;
 	}
 	$str .= $tab_str ."}\n";

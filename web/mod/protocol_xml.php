@@ -157,7 +157,6 @@ function tool_protocol_xml( $xml_dir, $proto_type = 'all', $filter = array() )
 	if ( empty( $GLOBALS[ 'all_protocol_id_info' ] ) )
 	{
 		$auto_path = dirname( dirname( $xml_file_list[ 0 ] ) );
-		$GLOBALS[ 'proto_xml_path' ] = $auto_path;
 		tool_protocol_auto_all_id( $auto_path );
 	}
 	tool_protocol_xml_preread( $xml_file_list );
@@ -506,10 +505,10 @@ function tool_protocol_xml_read_struct( $node, $module, $rank = 1 )
 		{
 			return;
 		}
-		$file = $GLOBALS[ 'proto_xml_path' ] .'/'. $node->getAttribute( 'from' );
+		$file = ROOT_PATH .'tool/protocol/xml/'. $node->getAttribute( 'from' );
 		if ( !is_file( $file ) )
 		{
-			show_excp( '找不到包含文件:'. $file );
+			show_excp( '找不到包含文件:'. $xml );
 		}
 		if ( isset( $GLOBALS[ 'include_recursion_check' ][ $file .'_'. $struct_name ] ) )
 		{
@@ -591,6 +590,15 @@ function tool_protocol_xml_read_struct( $node, $module, $rank = 1 )
 					$size_str = (int)$size_str * 1024;
 				}
 				$re[ 'size' ] = abs( (int)$size_str );
+			}
+		}
+		//是否白名单
+		if ( $node->hasAttribute( 'white_list' ) )
+		{
+			$is_white_list = strtolower( $node->getAttribute( 'white_list' ) );
+			if ( 'true' === $is_white_list )
+			{
+				$re[ 'is_write_list' ] = true;
 			}
 		}
 	}
