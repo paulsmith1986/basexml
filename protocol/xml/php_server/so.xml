@@ -1,69 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root>
-	<!--引用im.xml文件里的struct-->
-	<struct name="im_channel" from="client_server/im.xml"/>
 	<protocol>
-		<!--服务器给单个session推数据-->
-		<request name="so_push_session_data" id="20006" size="65k">
-			<key name="session_id" type="unsigned int" desc="session Id"/>
-			<key name="data" type="byte" desc="amf打包数据"/>
-		</request>
-		<!--服务器给单个用户推数据-->
-		<request name="so_push_role_data" id="20007" size="65k">
-			<key name="role_id" type="unsigned int" desc="用户Id"/>
-			<key name="data" type="byte" desc="amf打包数据"/>
-		</request>
-		<!--服务器给某个频道推数据-->
-		<request name="so_push_channel_data" id="20008" size="65k">
-			<key name="channel" type="struct" struct="im_channel" desc="频道Id"/>
-			<key name="data" type="byte" desc="amf打包数据"/>
-		</request>
-		<!--服务器给所有人推数据-->
-		<request name="so_push_world_data" id="20009" size="65k">
-			<key name="data" type="byte" desc="amf打包数据"/>
-		</request>
-		<!--服务器给一些人推数据-->
-		<request name="so_push_role_list_data" size="65k" id="20010">
-			<key name="role_list" type="list" desc="roleId列表">
-				<list type="unsigned int"/>
-			</key>
-			<key name="data" type="byte" desc="amf打包数据"/>
-		</request>
-	</protocol>
-	<protocol>
-		<!--用户进入游戏-->
-		<request name="so_role_enter" id="21000" size="200">
-			<key name="session_id" type="unsigned int" desc="会话ID"/>
-			<key name="role_id" type="unsigned int" desc="角色ID"/>
-			<key name="swf_id" type="unsigned int" desc="人物模型ID"/>
-			<key name="role_name" type="char" len="20" desc="角色名称"/>
-			<key name="level" type="smallint" desc="等级"/>
-			<key name="job_id" type="smallint" desc="职业"/>
-			<key name="flag" type="int" desc="是否已经提示角色已经在线的标志"/>
-		</request>
-		<!--发送初始化角色数据包-->
-		<response name="game_init" id="21001" size="20">
-			<key name="role_id" type="unsigned int" desc="角色ID"/>
-		</response>
-		<!--加入聊天频道-->
-		<request name="role_join_channel" id="21002" size="30">
-			<key name="role_id" type="unsigned int" desc="角色ID"/>
-			<key name="join_ch" type="struct" struct="im_channel" desc="加入频道"/>
-		</request>
-	</protocol>
-	<protocol>
-		<!--ping包-->
-		<request name="php_ping" id="20002" size="10"/>
-	</protocol>
-	<protocol>
-		<!--连接im服务器-->
-		<request name="so_php_join" id="20000" size="200">
-			<key name="join_str" type="varchar" desc="加入密钥"/>
+		<!--连接服务器-->
+		<request name="so_php_join" id="20000">
 			<key name="socket_type" type="tinyint" desc="连接类型"/>
 		</request>
 		<!--PHP加入服务器返回-->
-		<response name="so_php_join_re" id="20001" size="20">
-			<key name="result" type="unsigned int" desc="ping包返回"/>
+		<response name="so_php_join_re" id="20001">
+			<key name="result" type="unsigned int" desc="加入结果"/>
 		</response>
 	</protocol>
 </root>

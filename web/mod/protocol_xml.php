@@ -505,14 +505,14 @@ function tool_protocol_xml_read_struct( $node, $module, $rank = 1 )
 		{
 			return;
 		}
-		$file = ROOT_PATH .'tool/protocol/xml/'. $node->getAttribute( 'from' );
+		$file = ROOT_PATH .'protocol/xml/'. $node->getAttribute( 'from' );
 		if ( !is_file( $file ) )
 		{
-			show_excp( '找不到包含文件:'. $xml );
+			show_excp( '找不到包含文件:'. $file );
 		}
 		if ( isset( $GLOBALS[ 'include_recursion_check' ][ $file .'_'. $struct_name ] ) )
 		{
-			show_excp( '检测到循环引用:'. $xml );
+			show_excp( '检测到循环引用:'. $file );
 		}
 		$GLOBALS[ 'include_recursion_check' ][ $file .'_'. $struct_name ] = true;
 		$now_all_protocol = $GLOBALS[ 'all_protocol' ];

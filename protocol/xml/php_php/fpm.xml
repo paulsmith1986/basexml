@@ -14,10 +14,6 @@
 			<key name="pid" type="unsigned int" desc="进程id"/>
 			<key name="fpm_id" type="unsigned smallint" desc="PHP进程号"/>
 		</both>
-		<!--fpm进程加入server-->
-		<both name="queue_wakeup" id="30001">
-			<key name="queue_id" type="tinyint" desc="进程id"/>
-		</both>
 		<!--空闲状态通知-->
 		<both name="fpm_idle_report" id="26006">
 			<key name="fpm_id" type="unsigned smallint" desc="PHP进程号"/>
