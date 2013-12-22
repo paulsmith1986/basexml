@@ -181,8 +181,6 @@ function tool_so_protocol_head_file()
 	$protocol_h .= "#include <stdlib.h>\n";
 	$protocol_h .= "#include \"yile_proto.h\"\n";
 	$protocol_h .= "#include \"php.h\"\n";
-	$protocol_h .= "#include \"encode_client.h\"\n";
-	$protocol_h .= "#include \"decode_client.h\"\n";
 	$protocol_h .= "#include \"proto_size.h\"\n";
 	$protocol_h .= "#pragma pack(1)\n";
 	$protocol_h .= join( '', $GLOBALS[ 'typedef_all' ] );

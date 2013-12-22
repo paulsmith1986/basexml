@@ -19,12 +19,15 @@ function main_index_control()
  */
 function main_proto_control()
 {
-	$build_path = ROOT_PATH .'build/';
-	$clent_xml = array(
+	$build_path = ROOT_PATH .'build/so/';
+	$client_xml = array(
 		ROOT_PATH .'protocol/xml/php_server',
 		ROOT_PATH .'protocol/xml/php_php',
 	);
-	tool_bin_protocol_client( $build_path, $clent_xml );
+	tool_so_protocol( $build_path, $client_xml );
+	tool_bin_protocol_size_def( $build_path );
+	tool_so_protocol_encode_switch( $client_xml, $build_path .'so_encode.h' );
+	tool_so_protocol_decode_switch( $client_xml, $build_path .'so_decode.h' );
 	$data = array(
 		'code_type'			=> 'no',
 	);
