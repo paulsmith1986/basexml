@@ -30,7 +30,6 @@ struct proto_so_so_php_join_t{
 };
 //代理数据包
 struct proto_so_so_fpm_proxy_t{
-	uint32_t											role_id;			//用户id
 	uint32_t											session_id;			//会话id
 	proto_bin_t*										data;				//转发数据包
 };

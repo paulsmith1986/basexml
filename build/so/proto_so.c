@@ -107,8 +107,6 @@ void soread_so_php_join_re( protocol_packet_t *byte_pack, zval *result_arr )
 void soread_so_fpm_proxy( protocol_packet_t *byte_pack, zval *result_arr )
 {
 	proto_so_so_fpm_proxy_t tmp_struct;
-	php_result_copy( byte_pack, &tmp_struct.role_id, sizeof( tmp_struct.role_id ) );
-	add_assoc_long( result_arr, "role_id", tmp_struct.role_id );
 	php_result_copy( byte_pack, &tmp_struct.session_id, sizeof( tmp_struct.session_id ) );
 	add_assoc_long( result_arr, "session_id", tmp_struct.session_id );
 	bytes_len_t len_data;

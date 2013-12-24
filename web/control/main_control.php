@@ -35,6 +35,14 @@ function main_proto_control()
 	$data = array(
 		'code_type'			=> 'no',
 	);
+
+	$build_path = ROOT_PATH .'build/tlog/';
+	$server_xml = array(
+		ROOT_PATH .'protocol/xml/php_server',
+		ROOT_PATH .'protocol/xml/php_php',
+	);
+	tool_bin_protocol_server( $build_path, $server_xml );
+	tool_bin_protocol_size_def( $build_path );
 	view_html( 'main', $data );
 }
 
