@@ -20,6 +20,8 @@ typedef struct proto_so_fpm_ping_re_t proto_so_fpm_ping_re_t;
 typedef struct proto_so_fpm_join_t proto_so_fpm_join_t;
 
 typedef struct proto_so_fpm_idle_report_t proto_so_fpm_idle_report_t;
+
+typedef struct proto_so_fpm_proxy_t proto_so_fpm_proxy_t;
 //PHP加入服务器返回
 struct proto_so_so_php_join_re_t{
 	uint32_t											result;				//加入结果
@@ -30,7 +32,7 @@ struct proto_so_so_php_join_t{
 };
 //代理数据包
 struct proto_so_so_fpm_proxy_t{
-	uint32_t											session_id;			//会话id
+	uint32_t											hash_id;			//哈希值
 	proto_bin_t*										data;				//转发数据包
 };
 //ping包
@@ -49,6 +51,11 @@ struct proto_so_fpm_join_t{
 //空闲状态通知
 struct proto_so_fpm_idle_report_t{
 	uint16_t											fpm_id;				//PHP进程号
+};
+//数据代理
+struct proto_so_fpm_proxy_t{
+	int32_t												session_id;			//会话id
+	proto_bin_t*										data;				//代理数据
 };
 #pragma pack()
 
@@ -76,6 +83,11 @@ void sowrite_fpm_join( protocol_result_t *all_result, HashTable *data_hash );
  * 生成 空闲状态通知
  */
 void sowrite_fpm_idle_report( protocol_result_t *all_result, HashTable *data_hash );
+
+/**
+ * 生成 数据代理
+ */
+void sowrite_fpm_proxy( protocol_result_t *all_result, HashTable *data_hash );
 
 /**
  * 解析 PHP加入服务器返回
@@ -106,4 +118,9 @@ void soread_fpm_join( protocol_packet_t *byte_pack, zval *result_arr );
  * 解析 空闲状态通知
  */
 void soread_fpm_idle_report( protocol_packet_t *byte_pack, zval *result_arr );
+
+/**
+ * 解析 数据代理
+ */
+void soread_fpm_proxy( protocol_packet_t *byte_pack, zval *result_arr );
 #endif

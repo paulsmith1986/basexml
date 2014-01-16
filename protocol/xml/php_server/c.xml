@@ -3,7 +3,7 @@
 	<protocol>
 		<!--代理数据包-->
 		<response name="so_fpm_proxy" id="60000" size="6k">
-			<key name="session_id" type="unsigned int" desc="会话id"/>
+			<key name="hash_id" type="unsigned int" desc="哈希值"/>
 			<key name="data" type="byte" desc="转发数据包"/>
 		</response>
 	</protocol>

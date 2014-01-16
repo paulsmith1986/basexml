@@ -16,7 +16,7 @@ proto_so_fpm_proxy_t *read_so_fpm_proxy( protocol_packet_t *byte_pack, protocol_
 		re_struct = (proto_so_fpm_proxy_t*)&result_pool->str[ result_pool->pos ];
 		result_pool->pos += sizeof( proto_so_fpm_proxy_t );
 	}
-	result_copy( byte_pack, &re_struct->session_id, sizeof( uint32_t ), result_pool );
+	result_copy( byte_pack, &re_struct->hash_id, sizeof( uint32_t ), result_pool );
 	re_struct->data = read_bytes( byte_pack, NULL, result_pool );
 	return re_struct;
 }
@@ -32,8 +32,8 @@ void print_so_fpm_proxy( proto_so_fpm_proxy_t *re )
 	yile_printf_tab_string( prefix_char, rank );
 	printf( "so_fpm_proxy\n" );
 	printf( "%s(\n", prefix_char );
-	printf( "    %s[session_id] = > ", prefix_char );
-	printf( "%u\n", re->session_id );
+	printf( "    %s[hash_id] = > ", prefix_char );
+	printf( "%u\n", re->hash_id );
 	printf( "    %s[data] = > ", prefix_char );
 	printf( "[Blob %d]\n", re->data->len );
 	printf( "%s)\n", prefix_char );

@@ -65,6 +65,18 @@
 			}																						\
 		}																							\
 		break;																						\
+		case 26007:																					\
+		{																							\
+			if( NULL == data_arr )																	\
+			{																						\
+				pack_name.error_code = PROTO_PACK_DATA_MISS;										\
+			}																						\
+			else																					\
+			{																						\
+				sowrite_fpm_proxy( &pack_name, data_arr );											\
+			}																						\
+		}																							\
+		break;																						\
 		default:																					\
 			pack_name.error_code = PROTO_UNKOWN_PACK;												\
 			zend_error( E_WARNING, "Unkown pack_id:%d", pack_id );									\

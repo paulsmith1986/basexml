@@ -34,6 +34,11 @@
 			soread_fpm_idle_report( data_arr, tmp_result );											\
 		}																							\
 		break;																						\
+		case 26007:																					\
+		{																							\
+			soread_fpm_proxy( data_arr, tmp_result );												\
+		}																							\
+		break;																						\
 		default:																					\
 			zend_error( E_WARNING, "Unkown pack_id:%d", pack_id );									\
 		break;																						\

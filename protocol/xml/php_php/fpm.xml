@@ -18,5 +18,10 @@
 		<both name="fpm_idle_report" id="26006">
 			<key name="fpm_id" type="unsigned smallint" desc="PHP进程号"/>
 		</both>
+		<!--数据代理-->
+		<both name="fpm_proxy" id="26007">
+			<key name="session_id" type="int" desc="会话id"/>
+			<key name="data" type="byte" desc="代理数据"/>
+		</both>
 	</protocol>
 </root>
