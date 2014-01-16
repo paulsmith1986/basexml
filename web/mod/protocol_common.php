@@ -1,5 +1,47 @@
 <?php
 /**
+ * 生成name_id的map
+ */
+function tool_so_id_name_map( $type = 3 )
+{
+	$id_map_list = array();
+	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
+	{
+		if ( $info[ 'is_sub' ] )
+		{
+			continue;
+		}
+		if ( !( $info[ 'proto_type' ] & $type ) )
+		{
+			continue;
+		}
+		$id_map_list[ $info[ 'struct_id' ] ] = $pid;
+	}
+	return $id_map_list;
+}
+
+/**
+ * 生成id=>name的map
+ */
+function tool_so_name_id_map( $type = 3 )
+{
+	$name_id_map = array();
+	foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $info )
+	{
+		if ( $info[ 'is_sub' ] )
+		{
+			continue;
+		}
+		if ( !( $info[ 'proto_type' ] & $type ) )
+		{
+			continue;
+		}
+		$name_id_map[ $pid ] = (int)$info[ 'struct_id' ];
+	}
+	return $name_id_map;
+}
+
+/**
  * 通用函数
  */
 function tool_bin_protocol_common( $struct_prefix = 'proto' )

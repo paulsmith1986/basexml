@@ -1,10 +1,10 @@
 <?php
 require_once ROOT_PATH .'web/mod/protocol_bin.php';
-require_once ROOT_PATH .'web/mod/protocol_xml.php';
+require_once ROOT_PATH .'web/YGP/protocol_xml.php';
 require_once ROOT_PATH .'web/mod/protocol_so.php';
 require_once ROOT_PATH .'web/mod/protocol_cpp.php';
-require_once ROOT_PATH .'web/mod/protocol_php.php';
-require_once ROOT_PATH .'web/mod/protocol_common.php';
+require_once ROOT_PATH .'web/YGP/protocol_php.php';
+require_once ROOT_PATH .'web/YGP/protocol_common.php';
 /**
  * 主入口
  */
@@ -43,6 +43,19 @@ function main_proto_control()
 	);
 	tool_bin_protocol_server( $build_path, $server_xml );
 	tool_bin_protocol_size_def( $build_path );
+
+	$build_path = ROOT_PATH .'build/php/';
+	if ( !is_dir( $build_path ) )
+	{
+		show_excp( 'Build path:'. $build_path .' not found' );
+	}
+	tool_protocol_xml( $server_xml, 'all' );
+	$build_arg = array( 'file_name' => 'proto_server', 'is_simulate' => false, 'unpack_mod' => 1, 'pack_mod' => 2 );
+	tool_protocol_php_build( $build_path, $build_arg );
+	$build_arg = array( 'file_name' => 'proto_client', 'is_simulate' => false, 'pack_mod' => 1, 'unpack_mod' => 2, 'id_name_type' => 2 );
+	tool_protocol_php_build( $build_path, $build_arg );
+	$client_map_file = $build_path .'proto_map_client.php';
+	$server_map_file = $build_path .'proto_map_server.php';
 	view_html( 'main', $data );
 }
 

@@ -2,13 +2,51 @@
 /**
  * PHP协议文件生成
  */
-function tool_protocol_php_build( $build_path, $is_simulate = true, $is_dispatch = false, $arg = array() )
+function tool_protocol_php_build( $build_path, $arg = array() )
 {
 	$need_base64 = isset( $arg[ 'need_base64' ] ) ? $arg[ 'need_base64' ] : true;
 	$unpack_mod = isset( $arg[ 'unpack_mod' ] ) ? $arg[ 'unpack_mod' ] : 3;
-	$file_name = isset( $arg[ 'file_name' ] ) ? $arg[ 'file_name' ] : 'proto_simulate.php';
+	$file_name = isset( $arg[ 'file_name' ] ) ? $arg[ 'file_name' ] : 'proto_simulate';
+	$is_simulate = isset( $arg[ 'is_simulate' ] ) ? $arg[ 'is_simulate' ] : true;
+	$is_dispatch = isset( $arg[ 'is_dispatch' ] ) ? $arg[ 'is_dispatch' ] : false;
+	$pack_mod = isset( $arg[ 'pack_mod' ] ) ? $arg[ 'pack_mod' ] : 3;
+	$file_name .= '.php';
 	$str = "<?php\n";
-	$str .= tool_protocol_unpack_dispatch( $is_simulate, $unpack_mod, $need_base64, $is_dispatch );
+	//名字和map对照方式
+	$id_name_type = isset( $arg[ 'id_name_type' ] ) ? $arg[ 'id_name_type' ] : 1;
+	//与文件生成在一起
+	if ( 1 == $id_name_type )
+	{
+		$id_name_arr = tool_so_id_name_map();
+		$name_id_arr = tool_so_name_id_map();
+		if ( !empty( $id_name_arr ) )
+		{
+			$str .= "\$PROTO_ID_NAME += ". var_export( $id_name_arr, true ) .";\n";
+		}
+		if ( !empty( $name_id_arr ) )
+		{
+			$str .= "\$PROTOCOL_ID_LIST += ". var_export( $name_id_arr, true ) .";\n";
+		}
+	}
+	//独立成一个文件
+	elseif ( 2 == $id_name_type )
+	{
+		$file = isset( $arg[ 'id_name_file' ] ) ? $arg[ 'id_name_file' ] : 'proto_map';
+		$file_str = tool_protocol_php_map();
+		$id_name_file = $build_path .'/'. $file .'.php';
+		file_put_contents( $id_name_file, $file_str );
+		echo '生成文件:'. $id_name_file;
+	}
+	if ( !isset( $arg[ 'no_pack' ] ) )
+	{
+		$str .= tool_protocol_php_pack( $pack_mod, $need_base64 );
+	}
+	if ( !isset( $arg[ 'no_unpack' ] ) )
+	{
+		$str .= tool_protocol_php_unpack( $unpack_mod );
+		$str .= tool_protocol_unpack_func();
+	}
+	//模拟数据
 	if ( $is_simulate )
 	{
 		foreach ( $GLOBALS[ 'all_protocol' ] as $pid => $rs )
@@ -54,26 +92,35 @@ function tool_protocol_php_build( $build_path, $is_simulate = true, $is_dispatch
 			$str .= tool_line( 'return $data;', 1 );
 			$str .= tool_line( '}' );
 		}
-	}
-	$pack_mod = isset( $arg[ 'pack_mod' ] ) ? $arg[ 'pack_mod' ] : 3;
-
-	if ( !isset( $arg[ 'no_pack' ] ) )
-	{
-		$str .= tool_protocol_php_pack( $pack_mod, $need_base64 );
-		$str .= tool_protocol_pack_dispatch( $pack_mod );
-	}
-	if ( !isset( $arg[ 'no_unpack' ] ) )
-	{
-		$str .= tool_protocol_php_unpack( $unpack_mod );
-		$str .= tool_protocol_unpack_func();
-	}
-	if ( $is_simulate )
-	{
 		$str .= tool_protocol_php_simulate_func();
 	}
 	$file = $build_path . $file_name;
 	file_put_contents( $file, $str );
 	echo '生成PHP协议文件:'. $file ."\n";
+}
+
+/**
+ * php map生成
+ */
+function tool_protocol_php_map( $type = 3 )
+{
+	$name_id_type = 1 == $type ? 1 : 2;
+	$id_name_type = 1 == $type ? 2 : 1;
+	if ( 3 == $type )
+	{
+		$name_id_type = 1|2;
+		$id_name_type = 1|2;
+	}
+	$name_id = tool_so_name_id_map( $name_id_type );
+	$name_id_str = var_export( $name_id, true );
+	$file_str = "<?php\n";
+	$file_str .= "\$PROTOCOL_ID_LIST = ";
+	$file_str .= $name_id_str . ";\n";
+	$id_name = tool_so_id_name_map( $id_name_type );
+	$id_name_str = var_export( $id_name, true );
+	$file_str .= "\$PROTO_ID_NAME = ";
+	$file_str .= $id_name_str . ";\n";
+	return $file_str;
 }
 
 /**
@@ -386,7 +433,7 @@ function tool_protocol_pack_dispatch( $pack_mod )
 	$str .= tool_line( 'throw new Exception( "Unkown pack_id:". $pack_id ."\n", 60002 );', 3 );
 	$str .= tool_line( 'break;', 2 );
 	$str .= tool_line( '}', 1 );
-	$str .= tool_line( 'return $data;' );
+	$str .= tool_line( 'return $data;', 1 );
 	$str .= tool_line( '}' );
 	return $str;
 }
