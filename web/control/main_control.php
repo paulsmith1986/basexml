@@ -21,15 +21,14 @@ function main_proto_control()
 {
 	$build_path = ROOT_PATH .'build/so/';
 	$client_xml = array(
-		ROOT_PATH .'protocol/xml/php_server',
-		ROOT_PATH .'protocol/xml/php_php',
+		ROOT_PATH .'web/YGP/basexml/fpm.xml',
 	);
 	tool_so_protocol( $build_path, $client_xml );
 	tool_bin_protocol_size_def( $build_path );
 	tool_so_protocol_encode_switch( $client_xml, $build_path .'so_encode.h' );
 	tool_so_protocol_decode_switch( $client_xml, $build_path .'so_decode.h' );
 	$client_xml = array(
-		ROOT_PATH .'protocol/xml/php_server/c.xml',
+		ROOT_PATH .'web/YGP/basexml/proxy.xml',
 	);
 	tool_bin_protocol_client( $build_path, $client_xml );
 	$data = array(
@@ -38,8 +37,7 @@ function main_proto_control()
 
 	$build_path = ROOT_PATH .'build/tlog/';
 	$server_xml = array(
-		ROOT_PATH .'protocol/xml/php_server',
-		ROOT_PATH .'protocol/xml/php_php',
+		ROOT_PATH .'web/YGP/basexml/proxy.xml',
 	);
 	tool_bin_protocol_server( $build_path, $server_xml );
 	tool_bin_protocol_size_def( $build_path );
