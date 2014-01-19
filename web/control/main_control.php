@@ -1,8 +1,8 @@
 <?php
-require_once ROOT_PATH .'web/mod/protocol_bin.php';
+require_once ROOT_PATH .'web/YGP/protocol_bin.php';
 require_once ROOT_PATH .'web/YGP/protocol_xml.php';
-require_once ROOT_PATH .'web/mod/protocol_so.php';
-require_once ROOT_PATH .'web/mod/protocol_cpp.php';
+require_once ROOT_PATH .'web/YGP/protocol_so.php';
+require_once ROOT_PATH .'web/YGP/protocol_cpp.php';
 require_once ROOT_PATH .'web/YGP/protocol_php.php';
 require_once ROOT_PATH .'web/YGP/protocol_common.php';
 /**
