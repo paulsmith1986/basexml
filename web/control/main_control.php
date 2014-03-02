@@ -58,6 +58,32 @@ function main_proto_control()
 }
 
 /**
+ * 生成进程协议
+ */
+function main_proto_process_control()
+{
+	$build_path = ROOT_PATH .'build/process/';
+	$server_xml = array(
+		ROOT_PATH .'web/YGP/basexml/process.xml',
+	);
+	tool_bin_protocol_server( $build_path, $server_xml );
+	tool_bin_protocol_encode_def( 'client', $build_path );
+	tool_bin_protocol_size_def( $build_path );
+	$arg = array(
+		'register_func_name'		=> 'yile_process_init_protocol',
+		'register_api'				=> 'yile_process_register_protocol',
+		'handle_prefix'				=> 'yile_process',
+		'handle_callback_prefix'	=> 'yile_process',
+		'header'					=> 'yile_process.h',
+	);
+	tool_bin_protocol_register( $arg, $build_path, 'server' );
+	$data = array(
+		'code_type'			=> 'no',
+	);
+	view_html( 'main', $data );
+}
+
+/**
  * 主入口
  */
 function main_test_control()

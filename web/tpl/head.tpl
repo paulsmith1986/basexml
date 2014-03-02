@@ -10,6 +10,7 @@
 <div id="head">
 	<span class="item"><a href="index.php">首页</a></span>
 	<span class="item"><a href="index.php?a=proto">生成协议</a></span>
+	<span class="item"><a href="index.php?a=proto_process">进程生成协议</a></span>
 </div>
 <hr/>
 <div>
